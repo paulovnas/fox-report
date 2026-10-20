@@ -1,6 +1,6 @@
 # @foxtag/fox-report (Fox Report)
 
-<a href="https://github.com/paulovnas/fox-report"><img src="assets/fox-report.png" width="140" align="right" alt="Logo Fox Report: raposa geométrica dentro de uma moldura de seleção"></a>
+<a href="https://github.com/paulovnas/fox-report"><img src="assets/fox-report.png" width="150" align="right" alt="Logo Fox Report: raposa geométrica dentro de uma moldura de seleção"></a>
 
 Widget universal de relato de bugs para aplicações web, com captura da aba,
 da região selecionada e do contexto do momento do erro. Cada relato vira uma
