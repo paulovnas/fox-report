@@ -1,4 +1,6 @@
-# @ene/report (eNe Report)
+# @foxtag/fox-report (Fox Report)
+
+<a href="https://github.com/paulovnas/fox-report"><img src="assets/fox-report.png" width="140" align="right" alt="Logo Fox Report: raposa geométrica dentro de uma moldura de seleção"></a>
 
 Widget universal de relato de bugs para aplicações web, com captura da aba,
 da região selecionada e do contexto do momento do erro. Cada relato vira uma
@@ -6,8 +8,8 @@ tarefa no Monday, com update detalhado e as duas imagens anexadas.
 
 O pacote tem dois pontos de entrada:
 
-- `@ene/report` — widget client, sem dependência de framework.
-- `@ene/report/server` — handler `(Request) => Promise<Response>` que valida o
+- `@foxtag/fox-report` — widget client, sem dependência de framework.
+- `@foxtag/fox-report/server` — handler `(Request) => Promise<Response>` que valida o
   relato e o encaminha para a API do Monday.
 
 O token do Monday fica **somente no servidor**. O navegador nunca o recebe.
@@ -17,7 +19,7 @@ O token do Monday fica **somente no servidor**. O navegador nunca o recebe.
 ```
 navegador                         servidor do app                 Monday
 ┌──────────────────────┐   POST   ┌──────────────────────┐  GraphQL  ┌────────────────────┐
-│ createEneReport()    │ ───────▶ │ createEneReportHandler│ ────────▶ │ board do projeto   │
+│ createFoxReport()    │ ───────▶ │ createFoxReportHandler│ ────────▶ │ board do projeto   │
 │ captura + contexto   │  JSON    │ valida + rate limit  │           │ Esteira: item +    │
 │ (sem token)          │          │ MONDAY_API_TOKEN     │           │ update + 2 anexos  │
 └──────────────────────┘          └──────────────────────┘           └────────────────────┘
@@ -39,15 +41,15 @@ Instalar o pacote não exibe botão nenhum.
 ## Instalação
 
 ```bash
-npm install @ene/report
+npm install @foxtag/fox-report
 ```
 
 Alternativa offline (sem registry): gere o tarball e instale o arquivo:
 
 ```bash
 npm run build
-npm pack            # gera ene-report-0.1.0.tgz
-npm install /caminho/ene-report-0.1.0.tgz
+npm pack            # gera fox-report-0.1.0.tgz
+npm install /caminho/fox-report-0.1.0.tgz
 ```
 
 Dependência de runtime: `html-to-image` (captura do DOM no navegador).
@@ -75,7 +77,7 @@ manager, config central, banco — **é decisão de cada projeto**; basta chegar
 no parâmetro do SDK. Nos exemplos usamos `process.env`/`.env.local` apenas
 por ser o caminho comum em Node.
 
-- **Servidor:** `token` (obrigatório) em `createEneReportHandler` e
+- **Servidor:** `token` (obrigatório) em `createFoxReportHandler` e
   `createBoardTemplate` — nunca no navegador.
 - **Cliente:** não precisa de chave; só `endpoint`, `project` e o controle
   `enabled`.
@@ -92,21 +94,22 @@ MONDAY_API_TOKEN=seu-token-do-monday
 O projeto pode vir da configuração do servidor ou do relato:
 
 ```ts
-// app/api/ene-report/route.ts (Next.js App Router)
-import { createEneReportHandler } from '@ene/report/server';
+// app/api/fox-report/route.ts (Next.js App Router)
+import { createFoxReportHandler } from '@foxtag/fox-report/server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-let handler: ReturnType<typeof createEneReportHandler> | null = null;
+let handler: ReturnType<typeof createFoxReportHandler> | null = null;
 function getHandler() {
   if (!handler) {
     const token = process.env.MONDAY_API_TOKEN;
-    if (!token) throw new Error('MONDAY_API_TOKEN não configurado.');
-    handler = createEneReportHandler({
+    const workspaceId = process.env.MONDAY_WORKSPACE_ID;
+    if (!token || !workspaceId) throw new Error('MONDAY_API_TOKEN e MONDAY_WORKSPACE_ID não configurados.');
+    handler = createFoxReportHandler({
       token,
       project: process.env.MONDAY_PROJECT ?? 'Portal eNe',
-      workspaceId: process.env.MONDAY_WORKSPACE_ID ?? '18101704',
+      workspaceId, // obrigatório: ID numérico do workspace
     });
   }
   return handler;
@@ -123,12 +126,12 @@ requisição para o padrão Fetch e chame o handler. O exemplo
 ### 2. Cliente: só aparece quando o app habilitar
 
 ```ts
-import { createEneReport } from '@ene/report';
+import { createFoxReport } from '@foxtag/fox-report';
 
-const report = createEneReport({
-  endpoint: '/api/ene-report',
+const report = createFoxReport({
+  endpoint: '/api/fox-report',
   project: 'Portal eNe',
-  enabled: appConfig.eneReportEnabled, // config do SEU app; padrão do pacote é false
+  enabled: appConfig.foxReportEnabled, // config do SEU app; padrão do pacote é false
 });
 ```
 
@@ -139,8 +142,8 @@ tela de configurações), use `report.setEnabled(true | false)`.
 Se o app já tem o próprio botão de feedback, desligue o FAB e abra o fluxo:
 
 ```ts
-const report = createEneReport({
-  endpoint: '/api/ene-report',
+const report = createFoxReport({
+  endpoint: '/api/fox-report',
   project: 'Portal eNe',
   enabled: true,
   showButton: false,
@@ -163,14 +166,14 @@ report.destroy();
 
 ```tsx
 import { useEffect, useMemo, useState } from 'react';
-import { createEneReport } from '@ene/report';
+import { createFoxReport } from '@foxtag/fox-report';
 
 export function App() {
   const [moduleEnabled, setModuleEnabled] = useState(true);
   const [customTrigger, setCustomTrigger] = useState(false);
 
-  const report = useMemo(() => createEneReport({
-    endpoint: '/api/ene-report',
+  const report = useMemo(() => createFoxReport({
+    endpoint: '/api/fox-report',
     project: 'Portal eNe',
     enabled: false,                 // o app liga abaixo
     showButton: !customTrigger,     // gatilho próprio quando true
@@ -188,7 +191,7 @@ export function App() {
     <>
       <label>
         <input type="checkbox" checked={moduleEnabled} onChange={e => setModuleEnabled(e.target.checked)} />
-        eNe Report habilitado
+        Fox Report habilitado
       </label>
       <label>
         <input type="checkbox" checked={customTrigger} onChange={e => setCustomTrigger(e.target.checked)} />
@@ -210,9 +213,9 @@ npm run dev                  # app em http://localhost:5173 (proxy /api)
 
 ### Next.js (App Router)
 
-`examples/nextjs/app/api/ene-report/route.ts` é o endpoint e
+`examples/nextjs/app/api/fox-report/route.ts` é o endpoint e
 `examples/nextjs/app/page.tsx` é o componente client com o controle
-condicional (`NEXT_PUBLIC_ENE_REPORT_ENABLED` e `setEnabled`).
+condicional (`NEXT_PUBLIC_FOX_REPORT_ENABLED` e `setEnabled`).
 
 ```bash
 cd examples/nextjs
@@ -237,7 +240,7 @@ Importante: o módulo que cria o handler deve ser inicializado na requisição
 - Versão do SDK.
 
 Inputs, `textarea`, `select`, `input[type=password]` e elementos com
-`data-ene-mask` são cobertos nas imagens. Use `mask`/`exclude` para seletores
+`data-fox-mask` são cobertos nas imagens. Use `mask`/`exclude` para seletores
 adicionais.
 
 O servidor redige novamente `context.url` e `network[].url` com a mesma lista
@@ -246,6 +249,9 @@ Isso protege contra um POST direto no endpoint que ignore a redação do
 widget; parâmetros adicionais podem ser informados em `redactParams`.
 
 ## Organização no Monday
+
+> **Guias:** [compatibilidade do board com o SDK](docs/monday-board.md) ·
+> [prompt pronto para um agente de IA criar/configurar o board](docs/ai-board-prompt.md)
 
 **Cada projeto tem seu próprio board**, com o nome igual ao `project` do
 relato (prefixo configurável via `boardPrefix`). O handler provisiona cada
@@ -295,8 +301,8 @@ Adiado) permanecem na Esteira.
 
 ### Template de boards
 
-`createBoardTemplate({ token, workspaceId? })` cria (ou reaproveita) o board
-**"eNe Reports — Template"** no padrão da ferramenta. Para um novo projeto:
+`createBoardTemplate({ token, workspaceId })` cria (ou reaproveita) o board
+**"Fox Report — Template"** no padrão da ferramenta. Para um novo projeto:
 
 - **Opção A (recomendada):** configure as automações no template, duplique o
   board no Monday e renomeie para o nome do projeto (a duplicação copia as
@@ -308,7 +314,7 @@ Adiado) permanecem na Esteira.
 
 ```js
 // scripts/create-template.mjs
-import { createBoardTemplate } from '@ene/report/server';
+import { createBoardTemplate } from '@foxtag/fox-report/server';
 const { boardId, boardUrl } = await createBoardTemplate({ token: process.env.MONDAY_API_TOKEN });
 console.log(boardUrl); // configure as automações e duplique por projeto
 ```
@@ -319,7 +325,7 @@ garante o board de um projeto antes do primeiro relato.
 
 ## Referência do cliente
 
-`createEneReport(options): EneReportInstance`
+`createFoxReport(options): FoxReportInstance`
 
 | Opção | Padrão | Descrição |
 | --- | --- | --- |
@@ -331,7 +337,7 @@ garante o board de um projeto antes do primeiro relato.
 | `position` | `bottom-right` | canto do FAB |
 | `offset` | `0` | distância extra em px |
 | `zIndex` | `2147483000` | camada do widget |
-| `accent` | laranja eNe | cor do FAB e do envio |
+| `accent` | laranja Fox | cor do FAB e do envio |
 | `colorScheme` | `auto` | `auto`, `light` ou `dark` |
 | `types` | Bug/Layout/Conteúdo/Outro | chips de tipo (`[]` esconde) |
 | `strings` | pt-BR | sobrescreve textos |
@@ -357,7 +363,7 @@ Métodos: `open()`, `close()`, `setEnabled(boolean)`, `isEnabled()`,
 
 ## Referência do servidor
 
-`createEneReportHandler(options)` devolve uma função
+`createFoxReportHandler(options)` devolve uma função
 `(req: Request) => Promise<Response>` com `ready(project?)` para garantir o
 board de um projeto antes do primeiro relato.
 
@@ -365,7 +371,7 @@ board de um projeto antes do primeiro relato.
 | --- | --- | --- |
 | `token` | obrigatório | token do Monday (server-side) |
 | `project` | `Geral` | projeto padrão (board usado sem `project` no relato) |
-| `workspaceId` | `18101704` | workspace dos boards |
+| `workspaceId` | obrigatório | ID numérico do workspace do Monday |
 | `boardPrefix` | `''` | prefixo do nome dos boards por projeto |
 | `allowedOrigins` | só mesma origem | origens cross-origin permitidas |
 | `maxBodyBytes` | 25 MB | limite do JSON |
@@ -379,7 +385,7 @@ board de um projeto antes do primeiro relato.
 
 > **Migração da v0.1:** as opções `boardName` e `boardId` foram removidas —
 > o board agora é definido por projeto. Relatos enviados à versão antiga no
-> quadro único `eNe Reports` não são migrados pelo SDK.
+> quadro único `Fox Report` não são migrados pelo SDK.
 
 Respostas: `201` com `{ id, url?, boardId, updateId, attachments }`;
 `400` validação; `403` origem; `413` tamanho; `415` content-type;

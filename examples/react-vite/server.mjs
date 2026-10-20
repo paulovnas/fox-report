@@ -3,7 +3,7 @@
 import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { Readable } from 'node:stream';
-import { createEneReportHandler } from '@ene/report/server';
+import { createFoxReportHandler } from '@foxtag/fox-report/server';
 
 for (const file of ['.env.local', '../../.env.local']) {
   try {
@@ -19,14 +19,14 @@ if (!process.env.MONDAY_API_TOKEN) {
   process.exit(1);
 }
 
-const handler = createEneReportHandler({
+const handler = createFoxReportHandler({
   token: process.env.MONDAY_API_TOKEN,
   project: process.env.MONDAY_PROJECT ?? 'Portal eNe',
   workspaceId: process.env.MONDAY_WORKSPACE_ID ?? '18101704',
 });
 
 const server = createServer(async (req, res) => {
-  if (!req.url?.startsWith('/api/ene-report')) {
+  if (!req.url?.startsWith('/api/fox-report')) {
     res.writeHead(404).end('not found');
     return;
   }
@@ -43,4 +43,4 @@ const server = createServer(async (req, res) => {
   res.end(Buffer.from(await response.arrayBuffer()));
 });
 
-server.listen(8787, () => console.log('API de exemplo em http://localhost:8787/api/ene-report'));
+server.listen(8787, () => console.log('API de exemplo em http://localhost:8787/api/fox-report'));

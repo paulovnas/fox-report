@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { createEneReport } from '@ene/report';
+import { createFoxReport } from '@foxtag/fox-report';
 
 type Mode = 'off' | 'module' | 'custom';
 
@@ -10,8 +10,8 @@ export default function App() {
   const [sent, setSent] = useState<string | null>(null);
 
   const enabled = moduleEnabled && mode !== 'off';
-  const report = useMemo(() => createEneReport({
-    endpoint: '/api/ene-report',
+  const report = useMemo(() => createFoxReport({
+    endpoint: '/api/fox-report',
     project: 'Portal eNe',
     // O pacote nasce desligado; o app decide ligar pela própria configuração.
     enabled: false,
@@ -21,7 +21,7 @@ export default function App() {
     types: ['Bug', 'Layout', 'Conteúdo', 'Outro'],
     metadata: () => ({ app: 'react-vite-example', version: '0.1.0', env: 'demo' }),
     onSent: result => setSent(result.url ?? result.id),
-    onError: error => console.error('[eNe Report]', error),
+    onError: error => console.error('[Fox Report]', error),
   }), [mode]);
 
   // enabled também aceita função, mas aqui o app controla em runtime com setEnabled.
@@ -39,7 +39,7 @@ export default function App() {
         <h2>Configuração do app</h2>
         <label>
           <input type="checkbox" checked={moduleEnabled} onChange={e => setModuleEnabled(e.target.checked)} />
-          Módulo eNe Report habilitado
+          Módulo Fox Report habilitado
         </label>
         <fieldset>
           <legend>Modo de integração</legend>

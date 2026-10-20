@@ -5,12 +5,12 @@ vi.mock('../../src/client/capture', async () => {
   const real = await vi.importActual<typeof import('../../src/client/capture')>('../../src/client/capture');
   return { ...real, captureViewport: async () => PNG, maskImage: async (img: string) => img, cropImage: async () => PNG };
 });
-import { createEneReport, type EneReportInstance, type EneReportOptions } from '../../src/client/index';
+import { createFoxReport, type FoxReportInstance, type FoxReportOptions } from '../../src/client/index';
 
-let inst: EneReportInstance | null = null;
+let inst: FoxReportInstance | null = null;
 
-const make = (options: Partial<EneReportOptions> = {}) => {
-  inst = createEneReport({ endpoint: '/api/ene-report', enabled: true, captureFn: async () => PNG, ...options });
+const make = (options: Partial<FoxReportOptions> = {}) => {
+  inst = createFoxReport({ endpoint: '/api/fox-report', enabled: true, captureFn: async () => PNG, ...options });
   return inst;
 };
 const click = (sel: string) => {
@@ -25,13 +25,13 @@ afterEach(() => { inst?.destroy(); inst = null; });
 describe('montagem e controle do app', () => {
   it('não mostra nada sem enabled: instalar o pacote não exibe o botão', () => {
     make({ enabled: undefined });
-    expect(document.querySelector('[data-ene-report]')).toBeNull();
+    expect(document.querySelector('[data-fox-report]')).toBeNull();
   });
 
   it('enabled aceita função de configuração do app', () => {
     let flag = false;
     make({ enabled: () => flag });
-    expect(document.querySelector('[data-ene-report]')).toBeNull();
+    expect(document.querySelector('[data-fox-report]')).toBeNull();
     flag = true;
     inst!.setEnabled(true);
     expect(q('.fab')).toBeTruthy();
@@ -39,17 +39,17 @@ describe('montagem e controle do app', () => {
 
   it('setEnabled monta e desmonta o widget em runtime', () => {
     make({ enabled: false });
-    expect(document.querySelector('[data-ene-report]')).toBeNull();
+    expect(document.querySelector('[data-fox-report]')).toBeNull();
     inst!.setEnabled(true);
     expect(inst!.isEnabled()).toBe(true);
     expect(q('.fab')).toBeTruthy();
     inst!.setEnabled(false);
-    expect(document.querySelector('[data-ene-report]')).toBeNull();
+    expect(document.querySelector('[data-fox-report]')).toBeNull();
   });
 
   it('showButton=false não renderiza FAB, mas open() abre o fluxo', async () => {
     make({ showButton: false });
-    expect(document.querySelector('[data-ene-report]')).toBeTruthy();
+    expect(document.querySelector('[data-fox-report]')).toBeTruthy();
     expect(q('.fab')).toBeNull();
     inst!.open();
     await flush();
@@ -58,8 +58,8 @@ describe('montagem e controle do app', () => {
 
   it('isola estilos no shadow root e marca o host para as capturas', () => {
     make();
-    const host = document.querySelector('[data-ene-report]') as HTMLElement;
-    expect(host.hasAttribute('data-ene-ui')).toBe(true);
+    const host = document.querySelector('[data-fox-report]') as HTMLElement;
+    expect(host.hasAttribute('data-fox-ui')).toBe(true);
     expect(host.shadowRoot?.querySelector('style')).toBeTruthy();
     expect(document.head.querySelector('style')).toBeNull();
   });
@@ -86,7 +86,7 @@ describe('fluxo de relato', () => {
     expect(q<HTMLImageElement>('.preview')!.src).toBe(PNG);
 
     click('.chips button');
-    const ta = q<HTMLTextAreaElement>('#ene-text')!;
+    const ta = q<HTMLTextAreaElement>('#fox-text')!;
     ta.value = 'O total do pedido aparece vazio.';
     ta.dispatchEvent(new Event('input', { bubbles: true }));
     click('.send');
@@ -94,7 +94,7 @@ describe('fluxo de relato', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [endpoint, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-    expect(endpoint).toBe('/api/ene-report');
+    expect(endpoint).toBe('/api/fox-report');
     expect(init.method).toBe('POST');
     const payload = JSON.parse(String(init.body));
     expect(payload.description).toBe('O total do pedido aparece vazio.');
@@ -103,7 +103,7 @@ describe('fluxo de relato', () => {
     expect(payload.reporter).toBe('user:ana');
     expect(payload.region).toBe(PNG);
     expect(payload.full).toBe(PNG);
-    expect(payload.context.sdk.name).toBe('@ene/report');
+    expect(payload.context.sdk.name).toBe('@foxtag/fox-report');
     expect(Array.isArray(payload.context.network)).toBe(true);
     expect(payload.context.region).toEqual({ x: 0, y: 0, w: window.innerWidth, h: window.innerHeight });
 
@@ -126,13 +126,13 @@ describe('fluxo de relato', () => {
     await flush();
     click('.bar .primary');
     await flush();
-    const ta = q<HTMLTextAreaElement>('#ene-text')!;
+    const ta = q<HTMLTextAreaElement>('#fox-text')!;
     ta.value = 'Layout quebrado';
     ta.dispatchEvent(new Event('input', { bubbles: true }));
     click('.send');
     await flush();
     expect(q('.error')!.textContent).toContain('Não foi possível enviar');
-    expect(q<HTMLTextAreaElement>('#ene-text')!.value).toBe('Layout quebrado');
+    expect(q<HTMLTextAreaElement>('#fox-text')!.value).toBe('Layout quebrado');
     expect(onError).toHaveBeenCalled();
   });
 });

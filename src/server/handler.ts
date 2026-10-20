@@ -1,4 +1,4 @@
-import type { CleanReport, EneReportHandler, EneReportServerOptions } from './types';
+import type { CleanReport, FoxReportHandler, FoxReportServerOptions } from './types';
 import { MondayClient, MondayError, type Provisioned } from './monday';
 import { cleanContext, decodePng, text } from './util';
 
@@ -15,8 +15,9 @@ const fail = (status: number, error: string, message: string, extra?: Record<str
  * Cria o handler `(req: Request) => Promise<Response>` para a rota do app que
  * recebe o relato e o encaminha ao Monday. O token nunca chega ao navegador.
  */
-export function createEneReportHandler(options: EneReportServerOptions): EneReportHandler {
-  if (!options?.token) throw new Error('createEneReportHandler: informe o token de API do Monday em `token`.');
+export function createFoxReportHandler(options: FoxReportServerOptions): FoxReportHandler {
+  if (!options?.token) throw new Error('createFoxReportHandler: informe o token de API do Monday em `token`.');
+  if (!options.workspaceId) throw new Error('createFoxReportHandler: informe o workspaceId do Monday onde os boards serão criados.');
   const o = { ...DEFAULTS, ...options };
   const project = (o.project ?? 'Geral').trim().slice(0, 120) || 'Geral';
   const boardPrefix = o.boardPrefix ?? '';
@@ -25,7 +26,7 @@ export function createEneReportHandler(options: EneReportServerOptions): EneRepo
   const logger = o.logger ?? (() => {});
   const client = new MondayClient({
     token: o.token,
-    workspaceId: o.workspaceId ?? '18101704',
+    workspaceId: o.workspaceId,
     boardPrefix,
     apiUrl: o.apiUrl ?? 'https://api.monday.com/v2',
     fileApiUrl: o.fileApiUrl ?? 'https://api.monday.com/v2/file',
@@ -170,7 +171,7 @@ export function createEneReportHandler(options: EneReportServerOptions): EneRepo
     }
   }
 
-  const handler = handle as EneReportHandler;
+  const handler = handle as FoxReportHandler;
   handler.ready = async (name?: string) => {
     const provisioned = await ready((name ?? project).trim() || project);
     return {

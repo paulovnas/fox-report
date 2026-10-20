@@ -1,4 +1,4 @@
-export { createEneReportHandler } from './handler';
+export { createFoxReportHandler } from './handler';
 export { createBoardTemplate } from './template';
 export type { BoardTemplateOptions } from './template';
 export { MondayClient, MondayError, GROUP_BACKLOG, GROUP_HISTORY, STATUS_LABELS, INITIAL_STATUS } from './monday';
@@ -10,7 +10,7 @@ export type {
   CleanElement,
   CleanNetworkEntry,
   CleanReport,
-  EneReportHandler,
-  EneReportServerOptions,
+  FoxReportHandler,
+  FoxReportServerOptions,
   MondayConfig,
 } from './types';

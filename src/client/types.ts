@@ -32,7 +32,7 @@ export type ReportContext = {
   network: NetworkEntry[];
   /** O que o app devolveu em `metadata()` (versão, usuário, ambiente...). */
   metadata: Record<string, unknown>;
-  sdk: { name: '@ene/report'; version: string };
+  sdk: { name: '@foxtag/fox-report'; version: string };
 };
 
 /** Corpo enviado ao endpoint do app. */
@@ -76,7 +76,7 @@ export type Strings = {
   close: string;
 };
 
-export type EneReportOptions = {
+export type FoxReportOptions = {
   /** Rota do app que encaminha o relato ao Monday. */
   endpoint: string;
   /** Nome do projeto; organiza o grupo no quadro do Monday. */
@@ -112,7 +112,7 @@ export type EneReportOptions = {
   metadata?: () => Record<string, unknown> | Promise<Record<string, unknown>>;
   /** Cobre `input`, `textarea` e `select` nas imagens. Padrão `true`. */
   maskInputs?: boolean;
-  /** Seletores extras cobertos nas imagens (`[data-ene-mask]` é sempre coberto). */
+  /** Seletores extras cobertos nas imagens (`[data-fox-mask]` é sempre coberto). */
   mask?: string[];
   /** Seletores removidos das imagens (banners, chat...). */
   exclude?: string[];
@@ -131,7 +131,7 @@ export type EneReportOptions = {
   onError?: (error: Error) => void;
 };
 
-export type EneReportInstance = {
+export type FoxReportInstance = {
   open(): void;
   close(): void;
   setEnabled(enabled: boolean): void;

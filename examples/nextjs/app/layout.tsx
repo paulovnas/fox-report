@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-export const metadata = { title: 'eNe Report — exemplo Next.js' };
+export const metadata = { title: 'Fox Report — exemplo Next.js' };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (

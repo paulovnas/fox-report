@@ -4,7 +4,7 @@
 // Modelo novo: um board por projeto (grupos Esteira/Histórico, coluna Status);
 // a movimentação para Histórico é automação nativa do Monday (não testável via API).
 import { readFileSync } from 'node:fs';
-import { createBoardTemplate, createEneReportHandler } from '../dist/server.mjs';
+import { createBoardTemplate, createFoxReportHandler } from '../dist/server.mjs';
 
 const env = Object.fromEntries(
   readFileSync('.env.local', 'utf8').split('\n').filter(line => line.includes('=')).map(line => {
@@ -60,12 +60,12 @@ const payload = (description, project, suffix) => ({
       { at: new Date().toISOString(), method: 'POST', url: '/api/pedidos/1/fechar', status: 500, durationMs: 91, type: 'xhr', requestBody: '{"pedido":1}', error: 'Internal Server Error' },
     ],
     metadata: { app: 'Portal eNe', version: '2.3.0', ambiente: 'teste-integracao' },
-    sdk: { name: '@ene/report', version: '0.1.0' },
+    sdk: { name: '@foxtag/fox-report', version: '0.1.0' },
   },
 });
 
 const post = async (handler, body) => {
-  const res = await handler(new Request('http://localhost/api/ene-report', {
+  const res = await handler(new Request('http://localhost/api/fox-report', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
@@ -94,11 +94,11 @@ const templateData = await gql(
   'query($id: [ID!]) { boards(ids: $id) { id name columns { title } groups { title } } }',
   { id: [template.boardId] },
 );
-assertStandardBoard(templateData.boards[0], 'eNe Reports — Template');
+assertStandardBoard(templateData.boards[0], 'Fox Report — Template');
 console.log('   template ok: 11 colunas, grupos Esteira + Histórico, idempotente');
 
 console.log('2) handler: provisionando boards por projeto…');
-const handler = createEneReportHandler({
+const handler = createFoxReportHandler({
   token,
   project: defaultProject,
   workspaceId,

@@ -35,7 +35,7 @@ describe('buildContext', () => {
     expect(ctx.viewport.w).toBe(window.innerWidth);
     expect(ctx.metadata.app).toBe('eNe');
     expect(ctx.network).toEqual([]);
-    expect(ctx.sdk.name).toBe('@ene/report');
+    expect(ctx.sdk.name).toBe('@foxtag/fox-report');
     expect(ctx.sdk.version).toMatch(/^\d+\.\d+\.\d+/);
   });
 

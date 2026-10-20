@@ -124,7 +124,7 @@ export function reportBody(overrides: Record<string, unknown> = {}) {
         { at: '2026-10-20T13:59:56.000Z', method: 'POST', url: '/api/erro', status: 500, durationMs: 90, type: 'xhr', error: 'Falha de rede ou requisição abortada' },
       ],
       metadata: { app: 'Portal eNe', version: '2.3.0' },
-      sdk: { name: '@ene/report', version: '0.1.0' },
+      sdk: { name: '@foxtag/fox-report', version: '0.1.0' },
     },
     ...overrides,
   };

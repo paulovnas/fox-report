@@ -43,7 +43,7 @@ export const recentConsoleErrors = (): ConsoleEntry[] => {
 };
 export const resetConsoleErrors = () => { errors = []; };
 
-const UI_SELECTOR = '[data-ene-ui]';
+const UI_SELECTOR = '[data-fox-ui]';
 const isOwnUi = (el: Element) => Boolean(el.closest(UI_SELECTOR));
 
 /** Nome do ancestral `data-*` mais próximo que identifica o componente. */
@@ -53,7 +53,7 @@ export function componentName(el: Element): string {
       const v = node.getAttribute(attr);
       if (v) return `${attr.slice(5)}:${v}`;
     }
-    const any = Array.from(node.attributes).find(a => a.name.startsWith('data-') && a.value && !a.name.startsWith('data-ene') && a.value.length < 60);
+    const any = Array.from(node.attributes).find(a => a.name.startsWith('data-') && a.value && !a.name.startsWith('data-fox') && a.value.length < 60);
     if (any) return `${any.name.slice(5)}:${any.value}`;
   }
   return '';
@@ -124,6 +124,6 @@ export function buildContext(opts: {
     consoleErrors: opts.includeConsole ? recentConsoleErrors() : [],
     network: opts.network ?? [],
     metadata: opts.metadata,
-    sdk: { name: '@ene/report', version: SDK_VERSION },
+    sdk: { name: '@foxtag/fox-report', version: SDK_VERSION },
   };
 }

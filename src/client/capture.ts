@@ -40,7 +40,7 @@ export async function captureViewport(opts: CaptureOptions = {}): Promise<string
     },
     filter: (node: Node) => {
       if (!(node instanceof Element)) return true;
-      if (node.hasAttribute('data-ene-ui')) return false;
+      if (node.hasAttribute('data-fox-ui')) return false;
       if (exclude) { try { if (node.matches(exclude)) return false; } catch { /* seletor inválido é ignorado */ } }
       return true;
     },
@@ -54,16 +54,16 @@ export async function captureViewport(opts: CaptureOptions = {}): Promise<string
   } finally { restore(); }
 }
 
-/** Retângulos do viewport a cobrir: inputs, senhas, `[data-ene-mask]` e seletores do app. */
+/** Retângulos do viewport a cobrir: inputs, senhas, `[data-fox-mask]` e seletores do app. */
 export function maskRects(opts: { maskInputs: boolean; selectors: string[] }): Rect[] {
-  const selectors = ['[data-ene-mask]', 'input[type="password"]', ...opts.selectors];
+  const selectors = ['[data-fox-mask]', 'input[type="password"]', ...opts.selectors];
   if (opts.maskInputs) selectors.push('input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="button"]):not([type="submit"])', 'textarea', 'select', '[contenteditable=""]', '[contenteditable="true"]');
   const rects: Rect[] = [], seen = new Set<Element>();
   for (const sel of selectors.filter(Boolean)) {
     let list: Element[] = [];
     try { list = Array.from(document.querySelectorAll(sel)); } catch { continue; }
     for (const el of list) {
-      if (seen.has(el) || el.closest('[data-ene-ui]')) continue;
+      if (seen.has(el) || el.closest('[data-fox-ui]')) continue;
       seen.add(el);
       const r = el.getBoundingClientRect();
       if (r.width < 1 || r.height < 1) continue;
@@ -73,7 +73,7 @@ export function maskRects(opts: { maskInputs: boolean; selectors: string[] }): R
   return rects;
 }
 
-export const selectorList = (selectors: string[]) => ['[data-ene-mask]', 'input[type="password"]', ...selectors].join(',');
+export const selectorList = (selectors: string[]) => ['[data-fox-mask]', 'input[type="password"]', ...selectors].join(',');
 
 const load = (src: string) => new Promise<HTMLImageElement>((resolve, reject) => {
   const img = new Image();

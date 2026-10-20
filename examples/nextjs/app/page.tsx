@@ -1,22 +1,22 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { createEneReport } from '@ene/report';
+import { createFoxReport } from '@foxtag/fox-report';
 
 export default function Page() {
-  const [moduleEnabled, setModuleEnabled] = useState(process.env.NEXT_PUBLIC_ENE_REPORT_ENABLED !== 'false');
+  const [moduleEnabled, setModuleEnabled] = useState(process.env.NEXT_PUBLIC_FOX_REPORT_ENABLED !== 'false');
   const [useOwnTrigger, setUseOwnTrigger] = useState(false);
   const [sent, setSent] = useState<string | null>(null);
 
-  const report = useMemo(() => createEneReport({
-    endpoint: '/api/ene-report',
+  const report = useMemo(() => createFoxReport({
+    endpoint: '/api/fox-report',
     project: 'Portal eNe (Next.js)',
     enabled: false,
     showButton: !useOwnTrigger,
     reporter: 'demo:next',
     metadata: () => ({ app: 'next-example', version: '0.1.0' }),
     onSent: result => setSent(result.url ?? result.id),
-    onError: error => console.error('[eNe Report]', error),
+    onError: error => console.error('[Fox Report]', error),
   }), [useOwnTrigger]);
 
   useEffect(() => {
@@ -32,7 +32,7 @@ export default function Page() {
       <section style={{ display: 'grid', gap: 8, marginBottom: 24 }}>
         <label>
           <input type="checkbox" checked={moduleEnabled} onChange={event => setModuleEnabled(event.target.checked)} />
-          Módulo eNe Report habilitado
+          Módulo Fox Report habilitado
         </label>
         <label>
           <input type="checkbox" checked={useOwnTrigger} onChange={event => setUseOwnTrigger(event.target.checked)} />

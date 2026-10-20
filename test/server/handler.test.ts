@@ -1,18 +1,18 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createEneReportHandler } from '../../src/server/index';
-import type { EneReportServerOptions } from '../../src/server/types';
+import { createFoxReportHandler } from '../../src/server/index';
+import type { FoxReportServerOptions } from '../../src/server/types';
 import { createMondayMock, PNG, reportBody } from './monday-mock';
 
-const endpoint = 'https://app.ene.com/api/ene-report';
-const makeHandler = (extra: Partial<EneReportServerOptions> = {}) => {
+const endpoint = 'https://app.ene.com/api/fox-report';
+const makeHandler = (extra: Partial<FoxReportServerOptions> = {}) => {
   const mock = createMondayMock();
-  const handler = createEneReportHandler({ token: 'token-secreto', fetch: mock.fetchMock, logger: () => {}, ...extra });
+  const handler = createFoxReportHandler({ token: 'token-secreto', workspaceId: '18101704', fetch: mock.fetchMock, logger: () => {}, ...extra });
   return { handler, mock };
 };
 const post = (body: unknown, headers: Record<string, string> = {}) =>
   new Request(endpoint, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) });
 
-describe('createEneReportHandler', () => {
+describe('createFoxReportHandler', () => {
   it('provisiona o board do projeto e cria item na Esteira, update e dois anexos', async () => {
     const { handler, mock } = makeHandler();
     const res = await handler(post(reportBody()));
@@ -76,7 +76,7 @@ describe('createEneReportHandler', () => {
   it('reaproveita board existente com o mesmo nome (sem criar outro)', async () => {
     const { handler, mock } = makeHandler();
     expect((await handler(post(reportBody()))).status).toBe(201);
-    const sameHandler = createEneReportHandler({ token: 'token-secreto', fetch: mock.fetchMock, logger: () => {} });
+    const sameHandler = createFoxReportHandler({ token: 'token-secreto', workspaceId: '18101704', fetch: mock.fetchMock, logger: () => {} });
     expect((await sameHandler(post(reportBody()))).status).toBe(201);
     expect(mock.calls.createBoard).toHaveLength(1);
     expect(mock.calls.createItem.map(i => i.boardId)).toEqual(['501', '501']);
@@ -154,7 +154,7 @@ describe('createEneReportHandler', () => {
 
   it('devolve 502 sem vazar o token quando o Monday falha', async () => {
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({ errors: [{ message: 'create_board não permitido' }] }), { status: 200, headers: { 'content-type': 'application/json' } }));
-    const handler = createEneReportHandler({ token: 'token-secreto', fetch: fetchMock as unknown as typeof fetch, logger: () => {} });
+    const handler = createFoxReportHandler({ token: 'token-secreto', workspaceId: '18101704', fetch: fetchMock as unknown as typeof fetch, logger: () => {} });
     const res = await handler(post(reportBody()));
     expect(res.status).toBe(502);
     const text = await res.text();
@@ -174,9 +174,9 @@ describe('createEneReportHandler', () => {
   });
 
   it('aplica boardPrefix no nome dos boards', async () => {
-    const { handler, mock } = makeHandler({ boardPrefix: 'eNe Reports · ' });
+    const { handler, mock } = makeHandler({ boardPrefix: 'Fox Report · ' });
     await handler(post(reportBody()));
-    expect(mock.calls.createBoard).toEqual([{ name: 'eNe Reports · Portal eNe' }]);
+    expect(mock.calls.createBoard).toEqual([{ name: 'Fox Report · Portal eNe' }]);
   });
 });
 
@@ -184,12 +184,12 @@ describe('createBoardTemplate', () => {
   it('cria o board template idempotente com grupos e colunas do padrão', async () => {
     const mock = createMondayMock();
     const { createBoardTemplate } = await import('../../src/server/index');
-    const first = await createBoardTemplate({ token: 't', fetch: mock.fetchMock });
+    const first = await createBoardTemplate({ token: 't', workspaceId: '18101704', fetch: mock.fetchMock });
     expect(first).toEqual({ boardId: '501', boardUrl: 'https://ene.monday.com/boards/501' });
-    expect(mock.calls.createBoard).toEqual([{ name: 'eNe Reports — Template' }]);
+    expect(mock.calls.createBoard).toEqual([{ name: 'Fox Report — Template' }]);
     expect(mock.calls.createColumn).toHaveLength(11);
     expect(mock.calls.createGroup.map(g => g.name)).toEqual(['Histórico', 'Esteira']);
-    const second = await createBoardTemplate({ token: 't', fetch: mock.fetchMock });
+    const second = await createBoardTemplate({ token: 't', workspaceId: '18101704', fetch: mock.fetchMock });
     expect(second.boardId).toBe('501');
     expect(mock.calls.createBoard).toHaveLength(1);
   });

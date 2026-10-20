@@ -1,5 +1,5 @@
 {
-  "name": "ene-report-next-example",
+  "name": "fox-report-next-example",
   "private": true,
   "version": "0.0.0",
   "scripts": {
@@ -8,7 +8,7 @@
     "start": "next start"
   },
   "dependencies": {
-    "@ene/report": "file:../..",
+    "@foxtag/fox-report": "file:../..",
     "next": "^15.1.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"

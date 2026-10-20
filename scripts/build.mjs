@@ -10,12 +10,12 @@ await build({
   bundle: true,
   format: 'esm',
   target: 'es2020',
-  outfile: 'dist/ene-report.mjs',
+  outfile: 'dist/fox-report.mjs',
   external: ['html-to-image'],
   sourcemap: true,
   legalComments: 'none',
   logLevel: 'warning',
-  banner: { js: '/*! @ene/report - MIT. Partes adaptadas do bugframe (MIT, vmatheus3). Ver THIRD_PARTY_NOTICES.md */' },
+  banner: { js: '/*! @foxtag/fox-report - MIT. Partes adaptadas do bugframe (MIT, vmatheus3). Ver THIRD_PARTY_NOTICES.md */' },
 });
 
 await build({
@@ -28,7 +28,7 @@ await build({
   sourcemap: true,
   legalComments: 'none',
   logLevel: 'warning',
-  banner: { js: '/*! @ene/report/server - MIT. Partes adaptadas do bugframe (MIT, vmatheus3). Ver THIRD_PARTY_NOTICES.md */' },
+  banner: { js: '/*! @foxtag/fox-report/server - MIT. Partes adaptadas do bugframe (MIT, vmatheus3). Ver THIRD_PARTY_NOTICES.md */' },
 });
 
 execFileSync('npx', ['tsc', '-p', 'tsconfig.build.json'], { stdio: 'inherit' });

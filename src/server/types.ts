@@ -48,13 +48,13 @@ export type MondayConfig = {
   logger: (scope: string, message: string) => void;
 };
 
-export type EneReportServerOptions = {
+export type FoxReportServerOptions = {
   /** Token de API do Monday. Nunca vai ao navegador. */
   token: string;
   /** Projeto padrão; usado quando o relato não envia `project`. */
   project?: string;
-  /** Workspace do Monday onde os boards são criados. Padrão `18101704` (eNe Developers). */
-  workspaceId?: string;
+  /** Workspace do Monday onde os boards são criados (obrigatório). */
+  workspaceId: string;
   /** Prefixo do nome dos boards por projeto. Padrão `''`: o board recebe o nome do projeto. */
   boardPrefix?: string;
   /** Endpoint GraphQL. Padrão `https://api.monday.com/v2`. */
@@ -78,7 +78,7 @@ export type EneReportServerOptions = {
   onReport?: (info: { itemId: string; boardId: string; updateId: string | null }) => void;
 };
 
-export type EneReportHandler = {
+export type FoxReportHandler = {
   (req: Request): Promise<Response>;
   /** Garante o board do projeto (prefixo + nome) antes do primeiro relato. */
   ready(project?: string): Promise<{ boardId: string; boardUrl: string | null }>;

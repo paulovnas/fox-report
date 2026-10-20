@@ -1,5 +1,5 @@
 {
-  "name": "@ene/report",
+  "name": "@foxtag/fox-report",
   "version": "0.1.0",
   "description": "Relato de bugs com captura de tela e contexto, integrado ao Monday. Widget universal para web e handler server-side.",
   "keywords": [
@@ -11,27 +11,27 @@
     "qa"
   ],
   "license": "MIT",
-  "author": "eNe",
-  "homepage": "https://github.com/paulovnas/ene-report#readme",
+  "author": "paulovnas",
+  "homepage": "https://github.com/paulovnas/fox-report#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/paulovnas/ene-report.git"
+    "url": "git+https://github.com/paulovnas/fox-report.git"
   },
   "bugs": {
-    "url": "https://github.com/paulovnas/ene-report/issues"
+    "url": "https://github.com/paulovnas/fox-report/issues"
   },
   "type": "module",
   "sideEffects": false,
   "engines": {
     "node": ">=18.17"
   },
-  "main": "./dist/ene-report.mjs",
-  "module": "./dist/ene-report.mjs",
+  "main": "./dist/fox-report.mjs",
+  "module": "./dist/fox-report.mjs",
   "types": "./dist/types/client/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/types/client/index.d.ts",
-      "import": "./dist/ene-report.mjs"
+      "import": "./dist/fox-report.mjs"
     },
     "./server": {
       "types": "./dist/types/server/index.d.ts",

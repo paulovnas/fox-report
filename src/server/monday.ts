@@ -15,7 +15,7 @@ export type Provisioned = {
   accountSlug: string | null;
 };
 
-/** Grupos fixos de todo board no padrão eNe Report. */
+/** Grupos fixos de todo board no padrão Fox Report. */
 export const GROUP_BACKLOG = 'Esteira';
 export const GROUP_HISTORY = 'Histórico';
 /** Valores da coluna Status; o que finaliza é papel da automação de Histórico. */
@@ -161,7 +161,7 @@ export class MondayClient {
   }
 
   /**
-   * Garante o board no padrão eNe Report (colunas + grupos Esteira/Histórico).
+   * Garante o board no padrão Fox Report (colunas + grupos Esteira/Histórico).
    * Reutiliza board existente com o mesmo nome; em board recém-criado remove o
    * grupo padrão vazio que o Monday inventa. Idempotente.
    */

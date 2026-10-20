@@ -2,7 +2,7 @@ export const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAA
 export const tick = (ms = 0) => new Promise(r => setTimeout(r, ms));
 export const flush = async () => { for (let i = 0; i < 6; i++) await tick(0); };
 export function shadow(): ShadowRoot {
-  const host = document.querySelector('[data-ene-report]') as HTMLElement | null;
+  const host = document.querySelector('[data-fox-report]') as HTMLElement | null;
   if (!host?.shadowRoot) throw new Error('widget não montado');
   return host.shadowRoot;
 }

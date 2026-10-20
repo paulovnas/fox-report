@@ -4,9 +4,9 @@ import { buildContext, installConsoleCapture } from './context';
 import { resolveStrings } from './i18n';
 import { recentNetwork, startNetworkRecorder } from './network';
 import { CSS_TEXT } from './styles';
-import type { EneReportInstance, EneReportOptions, Rect, ReportPayload, SendResult, Strings } from './types';
+import type { FoxReportInstance, FoxReportOptions, Rect, ReportPayload, SendResult, Strings } from './types';
 
-export type { EneReportInstance, EneReportOptions, NetworkEntry, ReportContext, ReportPayload, Rect, SendResult, Strings, Position, ElementInfo, ConsoleEntry } from './types';
+export type { FoxReportInstance, FoxReportOptions, NetworkEntry, ReportContext, ReportPayload, Rect, SendResult, Strings, Position, ElementInfo, ConsoleEntry } from './types';
 export { resolveStrings, DEFAULT_STRINGS } from './i18n';
 export { SDK_VERSION } from './version';
 
@@ -38,7 +38,7 @@ const norm = (a: { x: number; y: number }, b: { x: number; y: number }): Rect =>
   h: Math.round(Math.abs(a.y - b.y)),
 });
 
-function resolveReporter(opt: EneReportOptions['reporter']): string | undefined {
+function resolveReporter(opt: FoxReportOptions['reporter']): string | undefined {
   const clean = (value: string) => value.trim().slice(0, 120);
   try {
     if (typeof opt === 'string') return clean(opt) || undefined;
@@ -47,8 +47,8 @@ function resolveReporter(opt: EneReportOptions['reporter']): string | undefined 
   return undefined;
 }
 
-class EneReport implements EneReportInstance {
-  private o: EneReportOptions;
+class FoxReport implements FoxReportInstance {
+  private o: FoxReportOptions;
   private t: Strings;
   private host: HTMLElement | null = null;
   private root: ShadowRoot | null = null;
@@ -71,7 +71,7 @@ class EneReport implements EneReportInstance {
   private enabledOverride: boolean | null = null;
   private run = 0;
 
-  constructor(options: EneReportOptions) {
+  constructor(options: FoxReportOptions) {
     this.o = options;
     this.t = resolveStrings(options.strings);
     this.maskSelectors = options.mask ?? [];
@@ -117,7 +117,7 @@ class EneReport implements EneReportInstance {
 
   private mount() {
     if (this.host) return;
-    const host = h('div', { 'data-ene-ui': 'true', 'data-ene-report': '' });
+    const host = h('div', { 'data-fox-ui': 'true', 'data-fox-report': '' });
     host.style.cssText = 'all:initial;position:static;';
     this.root = host.attachShadow({ mode: 'open' });
     (this.o.container ?? document.body).append(host);
@@ -257,9 +257,9 @@ class EneReport implements EneReportInstance {
     if (!root) return;
     root.replaceChildren(h('style', {}, CSS_TEXT));
     const scheme = this.o.colorScheme ?? 'auto';
-    const shell = h('div', { class: 'ene', 'data-scheme': scheme });
-    if (this.o.accent) shell.style.setProperty('--ene-accent', this.o.accent);
-    if (this.o.zIndex !== undefined) shell.style.setProperty('--ene-z', String(this.o.zIndex));
+    const shell = h('div', { class: 'fox', 'data-scheme': scheme });
+    if (this.o.accent) shell.style.setProperty('--fox-accent', this.o.accent);
+    if (this.o.zIndex !== undefined) shell.style.setProperty('--fox-z', String(this.o.zIndex));
     root.append(shell);
     this.shell = shell;
     if ((this.phase === 'idle' || this.phase === 'capturing') && this.o.showButton !== false && this.isEnabled()) shell.append(this.renderFab());
@@ -274,8 +274,8 @@ class EneReport implements EneReportInstance {
     const t = this.t, busy = this.phase === 'capturing';
     const position = this.o.position ?? 'bottom-right';
     const wrap = h('div', { class: `fab-wrap ${position}` });
-    wrap.style.setProperty('--ene-x', `${this.o.offset?.x ?? 0}px`);
-    wrap.style.setProperty('--ene-y', `${this.o.offset?.y ?? 0}px`);
+    wrap.style.setProperty('--fox-x', `${this.o.offset?.x ?? 0}px`);
+    wrap.style.setProperty('--fox-y', `${this.o.offset?.y ?? 0}px`);
     const fab = h('button', { type: 'button', class: 'fab', 'aria-label': t.button, disabled: busy });
     fab.append(icon(busy ? ICON_SPIN : ICON_BUG));
     fab.addEventListener('click', () => void this.begin());
@@ -286,7 +286,7 @@ class EneReport implements EneReportInstance {
 
   private renderSelect(): HTMLElement {
     const t = this.t;
-    const layer = h('div', { class: 'layer', tabindex: '0', role: 'application', 'aria-label': t.selectHint, 'data-testid': 'ene-select-layer' });
+    const layer = h('div', { class: 'layer', tabindex: '0', role: 'application', 'aria-label': t.selectHint, 'data-testid': 'fox-select-layer' });
     const rectEl = h('div', { class: 'rect' });
     rectEl.style.display = 'none';
     const paintRect = () => {
@@ -365,7 +365,7 @@ class EneReport implements EneReportInstance {
   private renderSheet(): HTMLElement {
     const t = this.t;
     const backdrop = h('div', { class: 'backdrop' });
-    const sheet = h('section', { class: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'ene-title', tabindex: '-1' });
+    const sheet = h('section', { class: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'fox-title', tabindex: '-1' });
     sheet.style.bottom = `${this.kb}px`;
     backdrop.append(sheet);
     if (this.phase === 'sent') {
@@ -387,12 +387,12 @@ class EneReport implements EneReportInstance {
     const sending = this.phase === 'sending';
     const x = h('button', { type: 'button', class: 'x', 'aria-label': t.cancel, disabled: sending }, icon(ICON_X));
     x.addEventListener('click', () => { this.reset(); this.render(); this.restoreFocus(); });
-    sheet.append(h('header', {}, h('h2', { id: 'ene-title' }, t.title), x));
+    sheet.append(h('header', {}, h('h2', { id: 'fox-title' }, t.title), x));
     sheet.append(h('img', { class: 'preview', src: this.region, alt: t.previewAlt }));
     const again = h('button', { type: 'button', class: 'link', disabled: sending }, t.anotherArea);
     again.addEventListener('click', () => { this.rect = null; this.go('select'); });
-    sheet.append(again, h('label', { for: 'ene-text' }, t.descriptionLabel));
-    const ta = h('textarea', { id: 'ene-text', rows: 4, placeholder: t.descriptionPlaceholder, 'aria-required': 'true' });
+    sheet.append(again, h('label', { for: 'fox-text' }, t.descriptionLabel));
+    const ta = h('textarea', { id: 'fox-text', rows: 4, placeholder: t.descriptionPlaceholder, 'aria-required': 'true' });
     ta.value = this.text;
     ta.disabled = sending;
     sheet.append(ta);
@@ -441,9 +441,9 @@ class EneReport implements EneReportInstance {
  * Cria o reporter. Não mostra nada até `enabled` ser verdadeiro.
  * Também é seguro chamar no SSR: devolve uma instância inerte sem `window`.
  */
-export function createEneReport(options: EneReportOptions): EneReportInstance {
+export function createFoxReport(options: FoxReportOptions): FoxReportInstance {
   if (typeof window === 'undefined' || typeof document === 'undefined') {
     return { open() {}, close() {}, setEnabled() {}, isEnabled: () => false, destroy() {} };
   }
-  return new EneReport(options);
+  return new FoxReport(options);
 }
