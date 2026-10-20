@@ -42,8 +42,7 @@ Instalar o pacote não exibe botão nenhum.
 npm install @ene/report
 ```
 
-Enquanto o pacote não estiver no registry da empresa, gere o tarball e instale
-o arquivo:
+Alternativa offline (sem registry): gere o tarball e instale o arquivo:
 
 ```bash
 npm run build
@@ -52,6 +51,21 @@ npm install /caminho/ene-report-0.1.0.tgz
 ```
 
 Dependência de runtime: `html-to-image` (captura do DOM no navegador).
+
+## Release
+
+O workflow [`.github/workflows/release.yml`](.github/workflows/release.yml)
+publica no npm a cada tag `v*` (roda typecheck, testes, build e
+`npm publish --provenance`):
+
+1. Configure o secret **`NPM_TOKEN`** (token *Automation* gerado em
+   npmjs.com → Access Tokens) em GitHub → Settings → Secrets and variables →
+   Actions do repositório.
+2. Suba a versão e crie a tag: `npm version patch` (ou `minor`/`major`) —
+   cria commit + tag `v0.x.y`.
+3. `git push --follow-tags` — a Action publica e o release aparece no npm;
+   crie a release correspondente na aba **Releases** do GitHub para o
+   changelog.
 
 ## Configuração mínima
 
