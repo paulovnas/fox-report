@@ -1,0 +1,65 @@
+{
+  "name": "@ene/report",
+  "version": "0.1.0",
+  "description": "Relato de bugs com captura de tela e contexto, integrado ao Monday. Widget universal para web e handler server-side.",
+  "keywords": [
+    "bug-report",
+    "feedback",
+    "screenshot",
+    "widget",
+    "monday",
+    "qa"
+  ],
+  "license": "MIT",
+  "author": "eNe",
+  "homepage": "https://github.com/paulovnas/ene-report#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/paulovnas/ene-report.git"
+  },
+  "bugs": {
+    "url": "https://github.com/paulovnas/ene-report/issues"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18.17"
+  },
+  "main": "./dist/ene-report.mjs",
+  "module": "./dist/ene-report.mjs",
+  "types": "./dist/types/client/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/types/client/index.d.ts",
+      "import": "./dist/ene-report.mjs"
+    },
+    "./server": {
+      "types": "./dist/types/server/index.d.ts",
+      "import": "./dist/server.mjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md"
+  ],
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:integration": "node test/integration.monday.mjs",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build"
+  },
+  "dependencies": {
+    "html-to-image": "1.11.13"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "esbuild": "^0.25.0",
+    "jsdom": "^26.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^3.0.0"
+  }
+}
