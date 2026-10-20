@@ -21,7 +21,7 @@ navegador                         servidor do app                 Monday
 ┌──────────────────────┐   POST   ┌──────────────────────┐  GraphQL  ┌────────────────────┐
 │ createFoxReport()    │ ───────▶ │ createFoxReportHandler│ ────────▶ │ board do projeto   │
 │ captura + contexto   │  JSON    │ valida + rate limit  │           │ Esteira: item +    │
-│ (sem token)          │          │ MONDAY_API_TOKEN     │           │ update + 2 anexos  │
+│ (sem token)          │          │ MONDAY_API_TOKEN     │           │ zip + anexos       │
 └──────────────────────┘          └──────────────────────┘           └────────────────────┘
 ```
 
@@ -36,7 +36,7 @@ Instalar o pacote não exibe botão nenhum.
 - Node.js 18.17+ no servidor (fetch, `FormData` e `Blob` nativos).
 - Navegador com suporte a Shadow DOM e `PointerEvent` (navegadores atuais).
 - Token de API do Monday com permissão para criar quadro, colunas, grupos,
-  itens, updates e anexos no workspace desejado.
+  itens, updates e anexos no board informado (`boardId`).
 
 ## Instalação
 
@@ -104,12 +104,12 @@ let handler: ReturnType<typeof createFoxReportHandler> | null = null;
 function getHandler() {
   if (!handler) {
     const token = process.env.MONDAY_API_TOKEN;
-    const workspaceId = process.env.MONDAY_WORKSPACE_ID;
-    if (!token || !workspaceId) throw new Error('MONDAY_API_TOKEN e MONDAY_WORKSPACE_ID não configurados.');
+    const boardId = process.env.MONDAY_BOARD_ID;
+    if (!token || !boardId) throw new Error('MONDAY_API_TOKEN e MONDAY_BOARD_ID não configurados.');
     handler = createFoxReportHandler({
       token,
+      boardId, // board criado por você (duplicando o template do Fox Report)
       project: process.env.MONDAY_PROJECT ?? 'Portal eNe',
-      workspaceId, // obrigatório: ID numérico do workspace
     });
   }
   return handler;
@@ -253,13 +253,21 @@ widget; parâmetros adicionais podem ser informados em `redactParams`.
 > **Guias:** [compatibilidade do board com o SDK](docs/monday-board.md) ·
 > [prompt pronto para um agente de IA criar/configurar o board](docs/ai-board-prompt.md)
 
-**Cada projeto tem seu próprio board**, com o nome igual ao `project` do
-relato (prefixo configurável via `boardPrefix`). O handler provisiona cada
-board de forma idempotente (busca por nome no workspace com paginação; cria
-apenas se não existir; cache em memória por projeto):
+**O handler publica em um board fixo, informado por `boardId`** — ele nunca
+cria board, então o board que você apontar já vem com as automações
+configuradas. Fluxo recomendado:
 
-- Grupos fixos: **Esteira** (novos relatos são sempre criados aqui) e
-  **Histórico**.
+1. Crie o board do projeto **duplicando o "Fox Report — Template"**
+   (`createBoardTemplate`) e renomeie a cópia — a duplicação copia as
+   automações.
+2. Configure as automações no template uma vez (Status → Histórico; receita
+   abaixo).
+3. Informe o `boardId` da cópia no handler.
+
+O handler garante (de forma idempotente) que o board tem os grupos e colunas
+do padrão — sem tocar no resto do board:
+
+- Grupos: **Esteira** (novos relatos são sempre criados aqui) e **Histórico**.
 - Colunas:
 
 | Coluna | Tipo | Conteúdo |
@@ -279,8 +287,15 @@ apenas se não existir; cache em memória por projeto):
 
 Cada item recebe um **update** em HTML formatado (títulos em negrito, listas)
 com relato, página, elementos,
-console, requisições, metadados e uma seção de anexos. Os dois PNGs são
-anexados a esse update (`region.png` e `full.png`).
+console, requisições, metadados e uma seção de anexos. O update recebe:
+
+- `region.png` (região selecionada) e `full.png` (aba inteira);
+- **`fox-report-<item>.zip`** — pacote com tudo: `report.json`, `network.json`
+  (URLs redigidas, headers com nomes sensíveis redigidos, corpos quando
+  `networkBodies` estiver ativo), `console.json`, `metadata.json`,
+  `region.png`, `full.png` e o anexo do usuário em `anexo/`;
+- o **arquivo anexado pelo usuário** no widget (documento, zip, log…), com o
+  nome original.
 
 ### Movimentação automática para Histórico
 
@@ -304,24 +319,30 @@ Adiado) permanecem na Esteira.
 `createBoardTemplate({ token, workspaceId })` cria (ou reaproveita) o board
 **"Fox Report — Template"** no padrão da ferramenta. Para um novo projeto:
 
-- **Opção A (recomendada):** configure as automações no template, duplique o
-  board no Monday e renomeie para o nome do projeto (a duplicação copia as
-  automações). O handler reutiliza o board pelo nome.
-- **Opção B:** deixe o handler criar o board sozinho no primeiro relato e
-  adicione as automações manualmente nesse board.
+- configure as automações no template uma vez;
+- duplique o board no Monday e renomeie para o nome do projeto (a duplicação
+  copia as automações);
+- informe o `boardId` da cópia no handler do app.
+
+O handler **nunca cria board** — um `boardId` errado ou apagado devolve 502
+com a mensagem do Monday.
 
 ### Servidor (Node)
 
 ```js
 // scripts/create-template.mjs
 import { createBoardTemplate } from '@foxtag/fox-report/server';
-const { boardId, boardUrl } = await createBoardTemplate({ token: process.env.MONDAY_API_TOKEN });
-console.log(boardUrl); // configure as automações e duplique por projeto
+const { boardId, boardUrl } = await createBoardTemplate({
+  token: process.env.MONDAY_API_TOKEN,
+  workspaceId: process.env.MONDAY_WORKSPACE_ID,
+});
+console.log(boardUrl); // configure as automações, duplique por projeto e use o boardId da cópia
 ```
 
-A resposta do relato inclui `id`, `boardId`, `updateId`, `attachments` e,
-quando o slug da conta é acessível, `url` do item. `handler.ready(project?)`
-garante o board de um projeto antes do primeiro relato.
+A resposta do relato inclui `id`, `boardId`, `updateId`, `attachments`
+(`region`, `full`, `zip` e `attachment` quando houver anexo) e, quando o slug
+da conta é acessível, `url` do item. `handler.ready()` garante colunas/grupos
+antes do primeiro relato.
 
 ## Referência do cliente
 
@@ -330,7 +351,7 @@ garante o board de um projeto antes do primeiro relato.
 | Opção | Padrão | Descrição |
 | --- | --- | --- |
 | `endpoint` | — | rota do app que recebe o relato |
-| `project` | — | grupo no Monday (até 120 caracteres) |
+| `project` | — | projeto, gravado na coluna e usado pelo servidor (até 120 caracteres) |
 | `enabled` | `false` | `boolean` ou `() => boolean` |
 | `showButton` | `true` | `false` esconde o FAB; use `open()` |
 | `reporter` | — | `string` ou `() => string` |
@@ -338,14 +359,15 @@ garante o board de um projeto antes do primeiro relato.
 | `offset` | `0` | distância extra em px |
 | `zIndex` | `2147483000` | camada do widget |
 | `accent` | laranja Fox | cor do FAB e do envio |
-| `colorScheme` | `auto` | `auto`, `light` ou `dark` |
+| `colorScheme` | `auto` | tema do widget: `'light'`, `'dark'` ou `'auto'` (segue o sistema) |
 | `types` | Bug/Layout/Conteúdo/Outro | chips de tipo (`[]` esconde) |
 | `strings` | pt-BR | sobrescreve textos |
 | `captureConsole` | `true` | erros de console e exceções |
 | `network` | `true` | registra fetch/XHR |
-| `networkBodies` | `false` | inclui corpos textuais (≤500) |
+| `networkBodies` | `false` | inclui corpos textuais (≤2000) |
 | `networkLimit` | `50` | requisições guardadas |
 | `networkWindowMs` | `120000` | janela das requisições |
+| `maxAttachmentBytes` | 10 MB | tamanho máximo do anexo do usuário |
 | `metadata` | — | função sync/async com dados do app |
 | `maskInputs` | `true` | cobre campos nas imagens |
 | `mask` | `[]` | seletores extras cobertos |
@@ -364,18 +386,18 @@ Métodos: `open()`, `close()`, `setEnabled(boolean)`, `isEnabled()`,
 ## Referência do servidor
 
 `createFoxReportHandler(options)` devolve uma função
-`(req: Request) => Promise<Response>` com `ready(project?)` para garantir o
-board de um projeto antes do primeiro relato.
+`(req: Request) => Promise<Response>` com `ready()` para garantir colunas e
+grupos antes do primeiro relato.
 
 | Opção | Padrão | Descrição |
 | --- | --- | --- |
 | `token` | obrigatório | token do Monday (server-side) |
-| `project` | `Geral` | projeto padrão (board usado sem `project` no relato) |
-| `workspaceId` | obrigatório | ID numérico do workspace do Monday |
-| `boardPrefix` | `''` | prefixo do nome dos boards por projeto |
+| `boardId` | obrigatório | ID do board que recebe os relatos (duplicado do template); nunca cria board |
+| `project` | `Geral` | projeto padrão, gravado na coluna quando o relato não envia |
 | `allowedOrigins` | só mesma origem | origens cross-origin permitidas |
-| `maxBodyBytes` | 25 MB | limite do JSON |
+| `maxBodyBytes` | 48 MB | limite do JSON |
 | `maxImageBytes` | 10 MB | limite de cada PNG |
+| `maxAttachmentBytes` | 10 MB | limite do anexo do usuário (o Monday aceita até 500 MB por arquivo) |
 | `maxDescription` | 4000 | limite da descrição |
 | `redactParams` | — | parâmetros de URL extras redigidos (além da lista padrão) |
 | `rateLimit` | 10/min por IP | `false` desliga |
@@ -383,9 +405,10 @@ board de um projeto antes do primeiro relato.
 | `logger` | — | `(scope, message) => void` |
 | `onReport` | — | callback após criar o item |
 
-> **Migração da v0.1:** as opções `boardName` e `boardId` foram removidas —
-> o board agora é definido por projeto. Relatos enviados à versão antiga no
-> quadro único `Fox Report` não são migrados pelo SDK.
+> **Migração da v0.1:** `workspaceId`/`boardPrefix`/criação automática de
+> boards saíram — o handler agora exige `boardId` (duplicado do template,
+> com automações prontas). Vários projetos = um endpoint (e um `boardId`)
+> por projeto.
 
 Respostas: `201` com `{ id, url?, boardId, updateId, attachments }`;
 `400` validação; `403` origem; `413` tamanho; `415` content-type;
@@ -440,7 +463,7 @@ npm test                 # vitest + jsdom (client) e fetch mockado (server)
 npm run build
 ```
 
-Teste real com a API do Monday (cria quadro, itens, update e anexos; requer
+Teste real com a API do Monday (cria template/boards de teste, itens, update, zip e anexos; requer
 `.env.local` com `MONDAY_API_TOKEN`):
 
 ```bash

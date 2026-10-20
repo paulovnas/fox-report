@@ -108,7 +108,27 @@ describe('fluxo de relato', () => {
     expect(payload.context.region).toEqual({ x: 0, y: 0, w: window.innerWidth, h: window.innerHeight });
 
     expect(onSent).toHaveBeenCalledWith({ id: '12345', url: 'https://ene.monday.com/boards/1/pulses/12345' });
-    expect(q('.sent a')!.getAttribute('href')).toContain('12345');
+    // confirmação simples: sem link do Monday e sem mencionar onde foi parar
+    expect(q('.sent a')).toBeNull();
+    expect(q('.sent')!.textContent).toContain('encaminhado ao suporte');
+    expect(q('.sent')!.textContent).not.toContain('Monday');
+  });
+
+  it('não menciona Monday nem mostra link na confirmação mesmo com url do item', async () => {
+    const fetchMock = vi.fn(async () => jsonRes({ id: '99', url: 'https://qualquer.monday.com/boards/2/pulses/99' }));
+    make({ fetch: fetchMock as unknown as typeof fetch });
+    click('.fab');
+    await flush();
+    click('.bar .primary');
+    await flush();
+    const ta = q<HTMLTextAreaElement>('#fox-text')!;
+    ta.value = 'Relato com url';
+    ta.dispatchEvent(new Event('input', { bubbles: true }));
+    click('.send');
+    await flush();
+    expect(q('.sent')).toBeTruthy();
+    expect(q('.sent a')).toBeNull();
+    expect(q('.sent')!.textContent).not.toContain('monday');
   });
 
   it('mostra erro quando a captura falha', async () => {
@@ -134,5 +154,76 @@ describe('fluxo de relato', () => {
     expect(q('.error')!.textContent).toContain('Não foi possível enviar');
     expect(q<HTMLTextAreaElement>('#fox-text')!.value).toBe('Layout quebrado');
     expect(onError).toHaveBeenCalled();
+  });
+});
+
+describe('anexo do usuário e tema', () => {
+  const pickFile = async (input: HTMLInputElement, file: File) => {
+    Object.defineProperty(input, 'files', { value: [file], configurable: true });
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    await flush();
+  };
+
+  it('permite anexar arquivo, mostrar o nome e enviar no payload', async () => {
+    const fetchMock = vi.fn(async () => jsonRes({ id: '7' }));
+    make({ fetch: fetchMock as unknown as typeof fetch });
+    click('.fab');
+    await flush();
+    click('.bar .primary');
+    await flush();
+
+    const input = q<HTMLInputElement>('#fox-attach')!;
+    expect(input).toBeTruthy();
+    await pickFile(input, new File(['conteúdo do log'], 'erro-do-app.log', { type: 'text/plain' }));
+    expect(q('.attach-btn')!.textContent).toContain('erro-do-app.log');
+    expect(q('.attach-size')!.textContent).toContain('B');
+
+    const ta = q<HTMLTextAreaElement>('#fox-text')!;
+    ta.value = 'Com anexo';
+    ta.dispatchEvent(new Event('input', { bubbles: true }));
+    click('.send');
+    await flush();
+
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    const payload = JSON.parse(String(init.body));
+    expect(payload.attachment.name).toBe('erro-do-app.log');
+    expect(payload.attachment.type).toBe('text/plain');
+    expect(payload.attachment.size).toBe(16);
+    expect(payload.attachment.dataUrl).toContain('base64,');
+  });
+
+  it('permite remover o anexo antes de enviar', async () => {
+    make();
+    click('.fab');
+    await flush();
+    click('.bar .primary');
+    await flush();
+    const input = q<HTMLInputElement>('#fox-attach')!;
+    await pickFile(input, new File(['x'], 'arquivo.zip', { type: 'application/zip' }));
+    expect(q('.attach-btn')!.textContent).toContain('arquivo.zip');
+    click('.attach-clear');
+    expect(q('.attach-btn')!.textContent).not.toContain('arquivo.zip');
+    expect(q('.attach-btn')!.textContent).toContain('Anexar arquivo');
+  });
+
+  it('recusa arquivo acima do limite configurado', async () => {
+    make({ maxAttachmentBytes: 10 });
+    click('.fab');
+    await flush();
+    click('.bar .primary');
+    await flush();
+    const input = q<HTMLInputElement>('#fox-attach')!;
+    await pickFile(input, new File(['conteúdo maior que dez bytes'], 'grande.txt', { type: 'text/plain' }));
+    expect(q('.attach-note')!.textContent).toContain('grande demais');
+    expect(q('.attach-btn')!.textContent).toContain('Anexar arquivo');
+  });
+
+  it('colorScheme força o tema light ou dark', () => {
+    make({ colorScheme: 'dark' });
+    expect(q('.fox')!.getAttribute('data-scheme')).toBe('dark');
+    inst!.destroy();
+    inst = null;
+    make({ colorScheme: 'light' });
+    expect(q('.fox')!.getAttribute('data-scheme')).toBe('light');
   });
 });

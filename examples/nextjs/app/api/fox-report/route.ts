@@ -9,11 +9,12 @@ let handler: ReturnType<typeof createFoxReportHandler> | null = null;
 function getHandler() {
   if (!handler) {
     const token = process.env.MONDAY_API_TOKEN;
-    if (!token) throw new Error('MONDAY_API_TOKEN não configurado.');
+    const boardId = process.env.MONDAY_BOARD_ID;
+    if (!token || !boardId) throw new Error('MONDAY_API_TOKEN e MONDAY_BOARD_ID não configurados.');
     handler = createFoxReportHandler({
       token,
+      boardId, // board criado por você (duplicando o template do Fox Report)
       project: process.env.MONDAY_PROJECT ?? 'Portal eNe',
-      workspaceId: process.env.MONDAY_WORKSPACE_ID ?? '18101704',
     });
   }
   return handler;

@@ -4,7 +4,7 @@ import { buildContext, installConsoleCapture } from './context';
 import { resolveStrings } from './i18n';
 import { recentNetwork, startNetworkRecorder } from './network';
 import { CSS_TEXT } from './styles';
-import type { FoxReportInstance, FoxReportOptions, Rect, ReportPayload, SendResult, Strings } from './types';
+import type { FoxReportInstance, FoxReportOptions, Rect, ReportAttachment, ReportPayload, SendResult, Strings } from './types';
 
 export type { FoxReportInstance, FoxReportOptions, NetworkEntry, ReportContext, ReportPayload, Rect, SendResult, Strings, Position, ElementInfo, ConsoleEntry } from './types';
 export { resolveStrings, DEFAULT_STRINGS } from './i18n';
@@ -47,6 +47,9 @@ function resolveReporter(opt: FoxReportOptions['reporter']): string | undefined 
   return undefined;
 }
 
+const fmtSize = (bytes: number) =>
+  bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(bytes >= 10 * 1024 * 1024 ? 0 : 1)} MB` : bytes >= 1024 ? `${Math.round(bytes / 1024)} KB` : `${bytes} B`;
+
 class FoxReport implements FoxReportInstance {
   private o: FoxReportOptions;
   private t: Strings;
@@ -61,6 +64,7 @@ class FoxReport implements FoxReportInstance {
   private region = '';
   private text = '';
   private chosen: string[] = [];
+  private attachment: ReportAttachment | null = null;
   private kb = 0;
   private startPt: { x: number; y: number } | null = null;
   private opener: Element | null = null;
@@ -153,6 +157,7 @@ class FoxReport implements FoxReportInstance {
     this.error = '';
     this.text = '';
     this.chosen = [];
+    this.attachment = null;
     this.full = '';
     this.region = '';
     this.startPt = null;
@@ -218,6 +223,7 @@ class FoxReport implements FoxReportInstance {
       types: this.chosen,
       ...(project ? { project } : {}),
       ...(reporter ? { reporter } : {}),
+      ...(this.attachment ? { attachment: this.attachment } : {}),
       context,
       region: this.region,
       full: this.full,
@@ -246,7 +252,7 @@ class FoxReport implements FoxReportInstance {
     try { this.o.onSent?.(result); } catch (e) { this.fail(e); }
     window.setTimeout(() => {
       if (this.phase === 'sent') { this.reset(); this.render(); this.restoreFocus(); }
-    }, result.url ? 8000 : 2500);
+    }, 4000);
   }
   private sentResult: SendResult | null = null;
   private restoreFocus() { this.root?.querySelector<HTMLElement>('.fab')?.focus(); }
@@ -371,16 +377,11 @@ class FoxReport implements FoxReportInstance {
     if (this.phase === 'sent') {
       const content = h('div', { class: 'sent' }, icon(ICON_CHECK), h('strong', {}, t.sentTitle), h('span', {}, t.sentBody));
       const url = this.sentResult?.url;
-      if (url) {
-        const link = h('a', { href: url, target: '_blank', rel: 'noopener noreferrer' }, t.openItem);
-        content.append(link);
-      }
+      void url;
       sheet.append(content);
-      if (url) {
-        const close = h('button', { type: 'button', class: 'link' }, t.close);
-        close.addEventListener('click', () => { this.reset(); this.render(); this.restoreFocus(); });
-        sheet.append(close);
-      }
+      const close = h('button', { type: 'button', class: 'link' }, t.close);
+      close.addEventListener('click', () => { this.reset(); this.render(); this.restoreFocus(); });
+      sheet.append(close);
       queueMicrotask(() => sheet.focus());
       return backdrop;
     }
@@ -416,6 +417,40 @@ class FoxReport implements FoxReportInstance {
       sheet.append(chips);
     }
     if (this.error) sheet.append(h('p', { class: 'error', role: 'alert' }, this.error));
+    // ---- anexo opcional do usuário (documento, zip, log…)
+    const maxAttachment = this.o.maxAttachmentBytes ?? 10 * 1024 * 1024;
+    const attachRow = h('div', { class: 'attach' });
+    const fileInput = h('input', { type: 'file', id: 'fox-attach', class: 'attach-input', 'aria-label': t.attach, disabled: sending });
+    const drawAttach = (note = '') => {
+      attachRow.replaceChildren(fileInput);
+      attachRow.append(h('label', { class: 'attach-btn', for: 'fox-attach' }, this.attachment ? this.attachment.name : t.attach));
+      if (this.attachment) {
+        const clear = h('button', { type: 'button', class: 'attach-clear', 'aria-label': t.attachedClear, disabled: sending }, icon(ICON_X));
+        clear.addEventListener('click', () => { this.attachment = null; fileInput.value = ''; drawAttach(); });
+        attachRow.append(h('span', { class: 'attach-size' }, fmtSize(this.attachment.size)), clear);
+      }
+      if (note) attachRow.append(h('span', { class: 'attach-note', role: 'alert' }, note));
+    };
+    fileInput.addEventListener('change', () => {
+      const file = fileInput.files?.[0];
+      if (!file) return;
+      if (file.size > maxAttachment) {
+        this.attachment = null;
+        fileInput.value = '';
+        drawAttach(t.attachmentTooLarge.replace('{max}', fmtSize(maxAttachment)));
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result !== 'string') { drawAttach(t.sendFailed); return; }
+        this.attachment = { name: file.name, type: file.type || 'application/octet-stream', size: file.size, dataUrl: reader.result };
+        drawAttach();
+      };
+      reader.onerror = () => drawAttach(t.sendFailed);
+      reader.readAsDataURL(file);
+    });
+    drawAttach();
+    sheet.append(attachRow);
     sendBtn.addEventListener('click', () => void this.send());
     sync();
     sheet.append(sendBtn);

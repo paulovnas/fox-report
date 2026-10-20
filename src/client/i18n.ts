@@ -18,8 +18,10 @@ export const DEFAULT_STRINGS: Strings = {
   send: 'Enviar relato',
   sending: 'Enviando…',
   sentTitle: 'Enviado. Obrigado.',
-  sentBody: 'O relato foi registrado no quadro do Monday.',
-  openItem: 'Abrir a tarefa no Monday',
+  sentBody: 'Seu relato foi encaminhado ao suporte.',
+  attach: 'Anexar arquivo (opcional)',
+  attachedClear: 'Remover anexo',
+  attachmentTooLarge: 'Arquivo grande demais. Limite: {max}.',
   sendFailed: 'Não foi possível enviar o relato. Sua descrição foi mantida, tente de novo.',
   close: 'Fechar',
 };

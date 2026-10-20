@@ -49,6 +49,42 @@ export function isPng(bytes: Uint8Array, maxBytes = 10 * 1024 * 1024): boolean {
   return w >= 1 && h >= 1 && w <= 16384 && h <= 16384;
 }
 
+export type DecodedAttachment = { name: string; type: string; bytes: Uint8Array };
+
+/**
+ * Valida o anexo opcional do usuário: data URL base64 (qualquer tipo de
+ * arquivo), tamanho limitado e nome sem caminho/caracteres de controle.
+ * Devolve null (ausente), 'invalid' (corrompido/grande demais) ou o anexo.
+ */
+export function decodeAttachment(value: unknown, maxBytes: number): DecodedAttachment | null | 'invalid' {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== 'object' || Array.isArray(value)) return 'invalid';
+  const raw = value as Record<string, unknown>;
+  let data = typeof raw.dataUrl === 'string' ? raw.dataUrl : '';
+  if (data.startsWith('data:')) {
+    const at = data.indexOf('base64,');
+    if (at < 0) return 'invalid';
+    data = data.slice(at + 'base64,'.length);
+  }
+  if (!data) return 'invalid';
+  if (data.length > Math.ceil(maxBytes * 4 / 3) + 8) return 'invalid';
+  let bytes: Uint8Array;
+  try {
+    const buffer = Buffer.from(data, 'base64');
+    if (!buffer.length) return 'invalid';
+    bytes = new Uint8Array(buffer);
+  } catch { return 'invalid'; }
+  if (bytes.length > maxBytes) return 'invalid';
+  return { name: sanitizeFileName(typeof raw.name === 'string' ? raw.name : ''), type: text(raw.type, 100) || 'application/octet-stream', bytes };
+}
+
+/** Nome de arquivo seguro para guardar/anexar: sem caminho nem caracteres de controle. */
+export function sanitizeFileName(name: string): string {
+  const base = name.split(/[\\/]/).pop() ?? '';
+  const clean = base.replace(/[\u0000-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim().slice(0, 100);
+  return clean || 'anexo.bin';
+}
+
 const numberOrNull = (value: unknown): number | null => {
   if (value === null || value === '' || value === undefined) return null;
   const n = Number(value);
@@ -58,6 +94,25 @@ const rect = (value: unknown) => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const r = value as Record<string, unknown>;
   return { x: numberOrNull(r.x), y: numberOrNull(r.y), w: numberOrNull(r.w), h: numberOrNull(r.h) };
+};
+
+const BODY_MAX = 2000;
+const HEADER_MAX = 20;
+/** Header com nome sensível nunca é enviado com o valor real. */
+const SENSITIVE_HEADER = /(authorization|cookie|token|secret|password|api[-_]?key|^key$|session|signature|^sig$|^auth)/i;
+
+const cleanHeaders = (value: unknown): Record<string, string> | undefined => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const out: Record<string, string> = {};
+  let count = 0;
+  for (const [rawName, rawValue] of Object.entries(value as Record<string, unknown>)) {
+    if (count >= HEADER_MAX) break;
+    const name = text(rawName, 60).toLowerCase();
+    if (!name) continue;
+    out[name] = SENSITIVE_HEADER.test(name) ? '[redacted]' : text(rawValue, 200);
+    count++;
+  }
+  return count ? out : undefined;
 };
 
 function cleanNetwork(value: unknown, redactParams: string[]): CleanNetworkEntry[] {
@@ -72,8 +127,12 @@ function cleanNetwork(value: unknown, redactParams: string[]): CleanNetworkEntry
       durationMs: numberOrNull(entry.durationMs) ?? 0,
       type: text(entry.type, 6) || 'fetch',
     };
-    if (typeof entry.requestBody === 'string') out.requestBody = entry.requestBody.slice(0, 500);
-    if (typeof entry.responseBody === 'string') out.responseBody = entry.responseBody.slice(0, 500);
+    const requestHeaders = cleanHeaders(entry.requestHeaders);
+    const responseHeaders = cleanHeaders(entry.responseHeaders);
+    if (requestHeaders) out.requestHeaders = requestHeaders;
+    if (responseHeaders) out.responseHeaders = responseHeaders;
+    if (typeof entry.requestBody === 'string') out.requestBody = entry.requestBody.slice(0, BODY_MAX);
+    if (typeof entry.responseBody === 'string') out.responseBody = entry.responseBody.slice(0, BODY_MAX);
     if (typeof entry.error === 'string') out.error = entry.error.slice(0, 200);
     return out;
   });

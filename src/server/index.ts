@@ -4,7 +4,8 @@ export type { BoardTemplateOptions } from './template';
 export { MondayClient, MondayError, GROUP_BACKLOG, GROUP_HISTORY, STATUS_LABELS, INITIAL_STATUS } from './monday';
 export type { Provisioned } from './monday';
 export { buildUpdateBody } from './updateBody';
-export { cleanContext, decodePng, isPng } from './util';
+export { cleanContext, decodeAttachment, decodePng, isPng, sanitizeFileName } from './util';
+export { buildReportZip, bundleName } from './bundle';
 export type {
   CleanConsoleEntry,
   CleanElement,

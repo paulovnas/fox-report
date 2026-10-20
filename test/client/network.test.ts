@@ -37,15 +37,44 @@ describe('network recorder', () => {
     expect(entries[3].error).toContain('Failed to fetch');
   });
 
-  it('só guarda corpos quando networkBodies está ligado, truncando em 500', async () => {
-    const longBody = 'x'.repeat(900);
+  it('só guarda corpos quando networkBodies está ligado, truncando em 2000', async () => {
+    const longBody = 'x'.repeat(2500);
     window.fetch = vi.fn(async () => new Response(longBody, { status: 200, headers: { 'content-type': 'text/plain' } })) as unknown as typeof fetch;
     stop = startNetworkRecorder({ bodies: true, limit: 10 });
-    await window.fetch('/api/texto', { method: 'POST', body: 'a'.repeat(900) });
+    await window.fetch('/api/texto', { method: 'POST', body: 'a'.repeat(2500) });
     await flush();
     const [entry] = recentNetwork();
-    expect(entry.requestBody).toHaveLength(500);
-    expect(entry.responseBody).toHaveLength(500);
+    expect(entry.requestBody).toHaveLength(2000);
+    expect(entry.responseBody).toHaveLength(2000);
+  });
+
+  it('captura headers de request/response e redige os sensíveis', async () => {
+    window.fetch = vi.fn(async (_input, init) => new Response('{}', { status: 200, headers: { 'content-type': 'application/json', 'set-cookie': 'sessao=1' } })) as unknown as typeof fetch;
+    stop = startNetworkRecorder({ limit: 10 });
+    await window.fetch('/api/com-headers', {
+      method: 'POST',
+      headers: { authorization: 'Bearer segredo', 'content-type': 'application/json', 'x-request-id': 'abc' },
+      body: '{}',
+    });
+    await flush();
+    const [entry] = recentNetwork();
+    expect(entry.requestHeaders).toMatchObject({ authorization: '[redacted]', 'content-type': 'application/json', 'x-request-id': 'abc' });
+    expect(entry.responseHeaders).toMatchObject({ 'set-cookie': '[redacted]', 'content-type': 'application/json' });
+  });
+
+  it('captura headers do XHR via setRequestHeader', async () => {
+    window.fetch = vi.fn(async () => json({})) as unknown as typeof fetch;
+    stop = startNetworkRecorder({ limit: 10 });
+    const xhr = new window.XMLHttpRequest();
+    const done = new Promise<void>(resolve => {
+      xhr.addEventListener('loadend', () => setTimeout(resolve, 0));
+    });
+    xhr.open('GET', '/api/xhr');
+    xhr.setRequestHeader('x-api-key', 'chave-secreta');
+    xhr.send(null);
+    await done;
+    const entry = recentNetwork().find(e => e.type === 'xhr');
+    expect(entry?.requestHeaders).toMatchObject({ 'x-api-key': '[redacted]' });
   });
 
   it('descarta entradas fora da janela e respeita o limite', async () => {

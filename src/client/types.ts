@@ -12,6 +12,8 @@ export type NetworkEntry = {
   status: number | null;
   durationMs: number;
   type: 'fetch' | 'xhr';
+  requestHeaders?: Record<string, string>;
+  responseHeaders?: Record<string, string>;
   requestBody?: string;
   responseBody?: string;
   error?: string;
@@ -46,6 +48,19 @@ export type ReportPayload = {
   region: string;
   /** PNG data URL da aba inteira. */
   full: string;
+  /** Arquivo opcional anexado pelo usuário. */
+  attachment?: ReportAttachment;
+};
+
+export type ReportAttachment = {
+  /** Nome do arquivo, sem caminho. */
+  name: string;
+  /** MIME type declarado pelo navegador. */
+  type: string;
+  /** Tamanho em bytes. */
+  size: number;
+  /** Conteúdo em data URL base64. */
+  dataUrl: string;
 };
 
 export type SendResult = { id: string; url?: string };
@@ -71,7 +86,9 @@ export type Strings = {
   sending: string;
   sentTitle: string;
   sentBody: string;
-  openItem: string;
+  attach: string;
+  attachedClear: string;
+  attachmentTooLarge: string;
   sendFailed: string;
   close: string;
 };
@@ -102,12 +119,14 @@ export type FoxReportOptions = {
   captureConsole?: boolean;
   /** Registra chamadas fetch/XHR. Padrão `true`. */
   network?: boolean;
-  /** Inclui corpos de requisição/resposta (texto, até 500 caracteres). Padrão `false`. */
+  /** Inclui corpos de requisição/resposta (texto, até 2.000 caracteres). Padrão `false`. */
   networkBodies?: boolean;
   /** Máximo de requisições guardadas. Padrão 50. */
   networkLimit?: number;
   /** Janela de tempo das requisições guardadas. Padrão 120000 ms. */
   networkWindowMs?: number;
+  /** Tamanho máximo do arquivo anexado, em bytes. Padrão 10485760 (10 MB). */
+  maxAttachmentBytes?: number;
   /** Dados extras do app no momento do relato. */
   metadata?: () => Record<string, unknown> | Promise<Record<string, unknown>>;
   /** Cobre `input`, `textarea` e `select` nas imagens. Padrão `true`. */

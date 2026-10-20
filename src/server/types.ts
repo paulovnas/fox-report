@@ -8,6 +8,8 @@ export type CleanNetworkEntry = {
   status: number | null;
   durationMs: number;
   type: string;
+  requestHeaders?: Record<string, string>;
+  responseHeaders?: Record<string, string>;
   requestBody?: string;
   responseBody?: string;
   error?: string;
@@ -39,9 +41,10 @@ export type CleanReport = {
 
 export type MondayConfig = {
   token: string;
-  workspaceId: string;
-  /** Prefixo do nome dos boards por projeto. Padrão `''` (o board recebe o nome do projeto). */
-  boardPrefix: string;
+  /** Board dos relatos (handler). Obrigatório no handler; nunca cria board. */
+  boardId?: string;
+  /** Workspace (somente o createBoardTemplate usa, para criar o template). */
+  workspaceId?: string;
   apiUrl: string;
   fileApiUrl: string;
   fetch: typeof fetch;
@@ -51,22 +54,22 @@ export type MondayConfig = {
 export type FoxReportServerOptions = {
   /** Token de API do Monday. Nunca vai ao navegador. */
   token: string;
+  /** ID do board que recebe os relatos (duplicado do template por você). Obrigatório. */
+  boardId: string;
   /** Projeto padrão; usado quando o relato não envia `project`. */
   project?: string;
-  /** Workspace do Monday onde os boards são criados (obrigatório). */
-  workspaceId: string;
-  /** Prefixo do nome dos boards por projeto. Padrão `''`: o board recebe o nome do projeto. */
-  boardPrefix?: string;
   /** Endpoint GraphQL. Padrão `https://api.monday.com/v2`. */
   apiUrl?: string;
   /** Endpoint multipart do Monday. Padrão `https://api.monday.com/v2/file`. */
   fileApiUrl?: string;
   /** Origens de navegador autorizadas. Mesma origem é sempre aceita. */
   allowedOrigins?: '*' | string[] | ((origin: string) => boolean);
-  /** Limite do JSON recebido. Padrão 25 MB. */
+  /** Limite do JSON recebido. Padrão 48 MB (cobre 2 PNGs de 10 MB + anexo de 10 MB em base64). */
   maxBodyBytes?: number;
   /** Limite de cada PNG. Padrão 10 MB. */
   maxImageBytes?: number;
+  /** Limite do anexo opcional enviado pelo usuário. Padrão 10 MB (o Monday aceita até 500 MB). */
+  maxAttachmentBytes?: number;
   /** Limite da descrição. Padrão 4000 caracteres. */
   maxDescription?: number;
   /** Parâmetros de URL extras redigidos, além da lista padrão (token, password, secret...). */
@@ -80,6 +83,6 @@ export type FoxReportServerOptions = {
 
 export type FoxReportHandler = {
   (req: Request): Promise<Response>;
-  /** Garante o board do projeto (prefixo + nome) antes do primeiro relato. */
-  ready(project?: string): Promise<{ boardId: string; boardUrl: string | null }>;
+  /** Garante colunas e grupos do board antes do primeiro relato. */
+  ready(): Promise<{ boardId: string; boardUrl: string | null }>;
 };

@@ -47,8 +47,15 @@ button { font: inherit; color: inherit; }
 .send { min-height: 48px; border: 0; border-radius: 12px; background: var(--fox-accent); color: var(--fox-on-accent); font-size: 17px; font-weight: 600; cursor: pointer; }
 .send:disabled { opacity: .45; cursor: not-allowed; }
 .error { margin: 0; color: var(--fox-err); font-size: 15px; }
+.attach { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.attach-input { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; clip-path: inset(50%); }
+.attach-btn { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 12px; border-radius: 10px; border: 1px dashed var(--fox-line); background: var(--fox-bg); color: var(--fox-muted); font-size: 14px; cursor: pointer; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.attach-btn:hover, .attach-input:focus-visible + .attach-btn { border-color: var(--fox-accent); color: var(--fox-ink); }
+.attach-size { color: var(--fox-muted); font-size: 13px; }
+.attach-clear { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--fox-line); background: var(--fox-bg); color: var(--fox-muted); cursor: pointer; }
+.attach-clear svg { width: 12px; height: 12px; }
+.attach-note { color: var(--fox-err); font-size: 13px; }
 .sent { display: grid; justify-items: center; gap: 6px; padding: 24px 0; text-align: center; color: var(--fox-ok); } .sent span { color: var(--fox-muted); } .sent svg { width: 28px; height: 28px; }
-.sent a { color: #2563eb; font-weight: 600; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 @media print { .fox { display: none !important; } }
 `;

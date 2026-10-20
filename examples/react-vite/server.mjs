@@ -14,15 +14,15 @@ for (const file of ['.env.local', '../../.env.local']) {
   } catch { /* arquivo opcional */ }
 }
 
-if (!process.env.MONDAY_API_TOKEN) {
-  console.error('Defina MONDAY_API_TOKEN em .env.local antes de iniciar a API.');
+if (!process.env.MONDAY_API_TOKEN || !process.env.MONDAY_BOARD_ID) {
+  console.error('Defina MONDAY_API_TOKEN e MONDAY_BOARD_ID em .env.local antes de iniciar a API.');
   process.exit(1);
 }
 
 const handler = createFoxReportHandler({
   token: process.env.MONDAY_API_TOKEN,
+  boardId: process.env.MONDAY_BOARD_ID, // board criado por você (duplicando o template do Fox Report)
   project: process.env.MONDAY_PROJECT ?? 'Portal eNe',
-  workspaceId: process.env.MONDAY_WORKSPACE_ID ?? '18101704',
 });
 
 const server = createServer(async (req, res) => {

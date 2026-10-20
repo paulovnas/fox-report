@@ -14,7 +14,7 @@ export function createMondayMock() {
     deleteGroup: [] as { boardId: string; groupId: string }[],
     createItem: [] as { name: string; boardId: string; groupId: string; values: Record<string, unknown> }[],
     createUpdate: [] as string[],
-    uploads: [] as string[],
+    uploads: [] as { query: string; filename: string }[],
   };
   const boards = new Map<string, MockBoard>();
   let nextBoard = 500;
@@ -22,12 +22,19 @@ export function createMondayMock() {
 
   const json = (data: unknown) => new Response(JSON.stringify({ data }), { status: 200, headers: { 'content-type': 'application/json' } });
 
+  /** Pré-cria um board no mock (cenário do usuário: duplicado do template). */
+  const seedBoard = (id: string, name: string) => {
+    boards.set(id, { id, name, columns: [], groups: [] });
+  };
+
   const fetchMock = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const url = String(input);
     if (url.endsWith('/file')) {
       const form = init?.body as FormData;
-      calls.uploads.push(String(form.get('query')));
-      expectMap(form.get('map'));
+      const map = JSON.parse(String(form.get('map'))) as Record<string, string[]>;
+      if (!map.image?.includes('variables.file')) throw new Error('map multipart inválido');
+      const file = form.get('image') as File | null;
+      calls.uploads.push({ query: String(form.get('query')), filename: file?.name ?? '' });
       return json({ add_file_to_update: { id: 'asset' } });
     }
     const body = JSON.parse(String(init?.body)) as GqlBody;
@@ -92,15 +99,10 @@ export function createMondayMock() {
     throw new Error(`query não mockada: ${q}`);
   };
 
-  return { fetchMock: fetchMock as typeof fetch, calls, boards, PNG };
+  return { fetchMock: fetchMock as typeof fetch, calls, boards, seedBoard, PNG };
 }
 
-function expectMap(value: FormDataEntryValue | null) {
-  const map = JSON.parse(String(value)) as Record<string, string[]>;
-  if (!map.image?.includes('variables.file')) throw new Error('map multipart inválido');
-}
-
-export function reportBody(overrides: Record<string, unknown> = {}) {
+export function reportBody(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     description: 'O total do pedido aparece vazio.',
     types: ['Bug'],

@@ -27,14 +27,13 @@ export async function createBoardTemplate(options: BoardTemplateOptions): Promis
   const config: MondayConfig = {
     token: options.token,
     workspaceId: options.workspaceId,
-    boardPrefix: '',
     apiUrl: options.apiUrl ?? 'https://api.monday.com/v2',
     fileApiUrl: options.fileApiUrl ?? 'https://api.monday.com/v2/file',
     fetch: options.fetch ?? ((...args) => fetch(...args)),
     logger,
   };
   const client = new MondayClient(config);
-  const provisioned = await client.ensureBoard(options.boardName ?? 'Fox Report — Template');
+  const provisioned = await client.ensureTemplateBoard(options.boardName ?? 'Fox Report — Template');
   return {
     boardId: provisioned.boardId,
     boardUrl: provisioned.accountSlug ? `https://${provisioned.accountSlug}.monday.com/boards/${provisioned.boardId}` : null,

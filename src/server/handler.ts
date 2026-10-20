@@ -1,9 +1,10 @@
 import type { CleanReport, FoxReportHandler, FoxReportServerOptions } from './types';
 import { MondayClient, MondayError, type Provisioned } from './monday';
-import { cleanContext, decodePng, text } from './util';
+import { buildReportZip, bundleName } from './bundle';
+import { cleanContext, decodeAttachment, decodePng, text } from './util';
 
 const MB = 1024 * 1024;
-const DEFAULTS = { maxBodyBytes: 25 * MB, maxImageBytes: 10 * MB, maxDescription: 4000 };
+const DEFAULTS = { maxBodyBytes: 48 * MB, maxImageBytes: 10 * MB, maxAttachmentBytes: 10 * MB, maxDescription: 4000 };
 const json = (status: number, body: unknown, extra: Record<string, string> = {}) =>
   new Response(JSON.stringify(body), {
     status,
@@ -17,29 +18,24 @@ const fail = (status: number, error: string, message: string, extra?: Record<str
  */
 export function createFoxReportHandler(options: FoxReportServerOptions): FoxReportHandler {
   if (!options?.token) throw new Error('createFoxReportHandler: informe o token de API do Monday em `token`.');
-  if (!options.workspaceId) throw new Error('createFoxReportHandler: informe o workspaceId do Monday onde os boards serão criados.');
+  if (!options.boardId) throw new Error('createFoxReportHandler: informe o boardId do board que recebe os relatos (duplicado do template).');
   const o = { ...DEFAULTS, ...options };
   const project = (o.project ?? 'Geral').trim().slice(0, 120) || 'Geral';
-  const boardPrefix = o.boardPrefix ?? '';
   const rate = o.rateLimit === false ? null : { max: 10, windowMs: 60_000, ...(o.rateLimit ?? {}) };
   const hits = new Map<string, number[]>();
   const logger = o.logger ?? (() => {});
   const client = new MondayClient({
     token: o.token,
-    workspaceId: o.workspaceId,
-    boardPrefix,
+    boardId: o.boardId,
     apiUrl: o.apiUrl ?? 'https://api.monday.com/v2',
     fileApiUrl: o.fileApiUrl ?? 'https://api.monday.com/v2/file',
     fetch: o.fetch ?? ((...args) => fetch(...args)),
     logger,
   });
-  const boardNameFor = (name: string) => `${boardPrefix}${name}`;
-  const provisionings = new Map<string, Promise<Provisioned>>();
-  const ready = (name: string) => {
-    let provisioning = provisionings.get(name);
+  let provisioning: Promise<Provisioned> | null = null;
+  const ready = () => {
     if (!provisioning) {
-      provisioning = client.ensureBoard(boardNameFor(name)).catch(error => { provisionings.delete(name); throw error; });
-      provisionings.set(name, provisioning);
+      provisioning = client.ensureBoardById(String(o.boardId)).catch(error => { provisioning = null; throw error; });
     }
     return provisioning;
   };
@@ -133,14 +129,28 @@ export function createFoxReportHandler(options: FoxReportServerOptions): FoxRepo
       context: cleanContext(body!.context, o.redactParams),
     };
 
-    const provisioned = await ready(reportProject);
+    const attachment = decodeAttachment(body!.attachment, o.maxAttachmentBytes);
+    if (attachment === 'invalid') {
+      return fail(400, 'attachment_invalid', 'O anexo está ausente, grande demais ou não é um arquivo válido.');
+    }
+
+    const provisioned = await ready();
     const item = await client.createItem(provisioned, report);
-    let attachments = { region: false, full: false };
+    const attachments: Record<string, boolean> = { region: false, full: false, zip: false };
     if (item.updateId) {
-      attachments = {
-        region: await client.attach(item.updateId, 'region.png', region),
-        full: await client.attach(item.updateId, 'full.png', full),
-      };
+      attachments.region = await client.attach(item.updateId, 'region.png', region);
+      attachments.full = await client.attach(item.updateId, 'full.png', full);
+      // pacote único com tudo: contexto, network (com headers), console, metadados, capturas e anexo
+      attachments.zip = await client.attach(item.updateId, bundleName(item.itemId), buildReportZip({
+        itemId: item.itemId,
+        report,
+        region,
+        full,
+        ...(attachment ? { attachment } : {}),
+      }), 'application/zip');
+      if (attachment) {
+        attachments.attachment = await client.attach(item.updateId, attachment.name, attachment.bytes, attachment.type);
+      }
     }
     try { o.onReport?.({ itemId: item.itemId, boardId: provisioned.boardId, updateId: item.updateId }); } catch (e) { logger('onReport', String((e as Error)?.message ?? e)); }
     return json(201, {
@@ -172,8 +182,8 @@ export function createFoxReportHandler(options: FoxReportServerOptions): FoxRepo
   }
 
   const handler = handle as FoxReportHandler;
-  handler.ready = async (name?: string) => {
-    const provisioned = await ready((name ?? project).trim() || project);
+  handler.ready = async () => {
+    const provisioned = await ready();
     return {
       boardId: provisioned.boardId,
       boardUrl: provisioned.accountSlug ? `https://${provisioned.accountSlug}.monday.com/boards/${provisioned.boardId}` : null,

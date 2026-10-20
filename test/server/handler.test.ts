@@ -1,35 +1,37 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createFoxReportHandler } from '../../src/server/index';
+import { createBoardTemplate, createFoxReportHandler } from '../../src/server/index';
 import type { FoxReportServerOptions } from '../../src/server/types';
 import { createMondayMock, PNG, reportBody } from './monday-mock';
 
 const endpoint = 'https://app.ene.com/api/fox-report';
 const makeHandler = (extra: Partial<FoxReportServerOptions> = {}) => {
   const mock = createMondayMock();
-  const handler = createFoxReportHandler({ token: 'token-secreto', workspaceId: '18101704', fetch: mock.fetchMock, logger: () => {}, ...extra });
+  mock.seedBoard('501', 'Portal eNe');
+  const handler = createFoxReportHandler({ token: 'token-secreto', boardId: '501', fetch: mock.fetchMock, logger: () => {}, ...extra });
   return { handler, mock };
 };
 const post = (body: unknown, headers: Record<string, string> = {}) =>
   new Request(endpoint, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) });
 
 describe('createFoxReportHandler', () => {
-  it('provisiona o board do projeto e cria item na Esteira, update e dois anexos', async () => {
+  it('usa o board informado (nunca cria board), garante colunas/grupos e cria item na Esteira', async () => {
     const { handler, mock } = makeHandler();
     const res = await handler(post(reportBody()));
     expect(res.status).toBe(201);
     const body = await res.json() as { id: string; url: string; boardId: string; updateId: string; attachments: Record<string, boolean> };
-    expect(body).toMatchObject({ id: 'item_1', boardId: '501', updateId: 'update_1', attachments: { region: true, full: true } });
+    expect(body).toMatchObject({ id: 'item_1', boardId: '501', updateId: 'update_1', attachments: { region: true, full: true, zip: true } });
     expect(body.url).toBe('https://ene.monday.com/boards/501/pulses/item_1');
 
-    expect(mock.calls.createBoard).toEqual([{ name: 'Portal eNe' }]);
+    // board NUNCA é criado; colunas e grupos sim (idempotente)
+    expect(mock.calls.createBoard).toEqual([]);
     expect(mock.calls.createColumn).toHaveLength(11);
     expect(mock.calls.createColumn).toEqual(expect.arrayContaining(['Status', 'Tipo', 'Página', 'Capturado em', 'Console', 'Requests']));
-    // Histórico antes de Esteira; o grupo padrão do Monday é removido.
     expect(mock.calls.createGroup.map(g => g.name)).toEqual(['Histórico', 'Esteira']);
-    expect(mock.calls.deleteGroup).toEqual([{ boardId: '501', groupId: 'group_default' }]);
+    expect(mock.calls.deleteGroup).toEqual([]);
 
     const [item] = mock.calls.createItem;
     expect(item.name).toBe('O total do pedido aparece vazio.');
+    expect(item.boardId).toBe('501');
     expect(item.groupId).toBe('group_Esteira');
     expect(item.values).toMatchObject({
       col_Status: { label: 'Novo' },
@@ -54,46 +56,81 @@ describe('createFoxReportHandler', () => {
     expect(update).not.toContain('## ');
     expect(update).not.toContain('**Tipos:**');
 
-    expect(mock.calls.uploads).toHaveLength(2);
-    for (const query of mock.calls.uploads) expect(query).toContain('add_file_to_update(update_id: "update_1"');
+    expect(mock.calls.uploads).toHaveLength(3);
+    expect(mock.calls.uploads.map(u => u.filename)).toEqual(['region.png', 'full.png', `fox-report-item_1.zip`]);
   });
 
-  it('reaproveita o mesmo board para o mesmo projeto e cria board separado para outro projeto', async () => {
+  it('reaproveita o mesmo board sem recriar colunas/grupos no segundo relato', async () => {
     const { handler, mock } = makeHandler();
     expect((await handler(post(reportBody()))).status).toBe(201);
-    expect((await handler(post(reportBody({ description: 'Segundo relato do mesmo projeto.' })))).status).toBe(201);
-    expect((await handler(post(reportBody({ project: 'App Interno', description: 'Relato de outro projeto.' })))).status).toBe(201);
-    expect(mock.calls.createBoard).toEqual([{ name: 'Portal eNe' }, { name: 'App Interno' }]);
-    expect(mock.calls.createColumn).toHaveLength(22); // 11 por board
-    expect(mock.calls.createItem.map(i => i.boardId)).toEqual(['501', '501', '502']);
-    // Board reaproveitado não remove grupo de novo; cada board novo remove o seu default.
-    expect(mock.calls.deleteGroup).toEqual([
-      { boardId: '501', groupId: 'group_default' },
-      { boardId: '502', groupId: 'group_default' },
+    expect((await handler(post(reportBody({ description: 'Segundo relato do mesmo board.' })))).status).toBe(201);
+    expect(mock.calls.createBoard).toEqual([]);
+    expect(mock.calls.createColumn).toHaveLength(11);
+    expect(mock.calls.createGroup).toHaveLength(2);
+    expect(mock.calls.createItem).toHaveLength(2);
+  });
+
+  it('devolve 502 com mensagem clara quando o board não existe', async () => {
+    const { handler, mock } = makeHandler();
+    const lost = createFoxReportHandler({ token: 'token-secreto', boardId: '999', fetch: mock.fetchMock, logger: () => {} });
+    const res = await lost(post(reportBody()));
+    expect(res.status).toBe(502);
+    expect((await res.json()).detail).toContain('999');
+    expect(mock.calls.createBoard).toEqual([]);
+  });
+
+  it('aceita anexo do usuário: grava no zip e anexa o arquivo ao update', async () => {
+    const { handler, mock } = makeHandler();
+    const attachment = { name: 'logs/app - erro.log', type: 'text/plain', size: 11, dataUrl: 'data:text/plain;base64,' + Buffer.from('hello world').toString('base64') };
+    const res = await handler(post(reportBody({ attachment })));
+    expect(res.status).toBe(201);
+    const body = await res.json() as { attachments: Record<string, boolean> };
+    expect(body.attachments).toMatchObject({ region: true, full: true, zip: true, attachment: true });
+
+    // 4 arquivos: 2 capturas + zip + anexo do usuário (nome sanitizado, sem caminho)
+    expect(mock.calls.uploads.map(u => u.filename)).toEqual([
+      'region.png',
+      'full.png',
+      expect.stringContaining('fox-report-item_1.zip'),
+      'app - erro.log',
     ]);
   });
 
-  it('reaproveita board existente com o mesmo nome (sem criar outro)', async () => {
-    const { handler, mock } = makeHandler();
-    expect((await handler(post(reportBody()))).status).toBe(201);
-    const sameHandler = createFoxReportHandler({ token: 'token-secreto', workspaceId: '18101704', fetch: mock.fetchMock, logger: () => {} });
-    expect((await sameHandler(post(reportBody()))).status).toBe(201);
-    expect(mock.calls.createBoard).toHaveLength(1);
-    expect(mock.calls.createItem.map(i => i.boardId)).toEqual(['501', '501']);
+  it('rejeita anexo corrompido ou acima do limite', async () => {
+    const { handler, mock } = makeHandler({ maxAttachmentBytes: 10 });
+    const bad = await handler(post(reportBody({ attachment: { name: 'a.txt', type: 'text/plain', size: 5, dataUrl: 'data:text/plain;base64,!!!!' } })));
+    expect(bad.status).toBe(400);
+    expect((await bad.json()).error).toBe('attachment_invalid');
+
+    const big = await handler(post(reportBody({ attachment: { name: 'a.txt', type: 'text/plain', size: 999, dataUrl: 'data:text/plain;base64,' + Buffer.from('x'.repeat(50)).toString('base64') } })));
+    expect(big.status).toBe(400);
+    expect(mock.calls.createItem).toHaveLength(0);
   });
 
-  it('usa o board do projeto padrão quando o relato não envia project', async () => {
+  it('payload sem anexo funciona igual (zip só com o padrão)', async () => {
+    const { handler, mock } = makeHandler();
+    const res = await handler(post(reportBody()));
+    expect(res.status).toBe(201);
+    const body = await res.json() as { attachments: Record<string, boolean> };
+    expect(body.attachments).toMatchObject({ region: true, full: true, zip: true });
+    expect(body.attachments.attachment).toBeUndefined();
+    expect(mock.calls.uploads).toHaveLength(3);
+  });
+
+  it('usa o projeto padrão para a coluna quando o relato não envia project', async () => {
     const { handler, mock } = makeHandler({ project: 'App Interno' });
     await handler(post(reportBody({ project: undefined })));
-    expect(mock.calls.createBoard).toEqual([{ name: 'App Interno' }]);
     expect(mock.calls.createItem[0].values.col_Projeto).toBe('App Interno');
   });
 
   it('redige URLs no servidor, inclusive network, e aceita parâmetros extras', async () => {
     const { handler, mock } = makeHandler({ redactParams: ['cpf'] });
     const body = reportBody();
-    body.context.url = 'https://app.ene.com/pedidos?token=x&password=y&cpf=123&id=7';
-    body.context.network[0].url = '/api/pedidos?api_key=abc&status=aberto';
+    const context = body.context as { url: string; network: Record<string, unknown>[] };
+    context.url = 'https://app.ene.com/pedidos?token=x&password=y&cpf=123&id=7';
+    context.network[0].url = '/api/pedidos?api_key=abc&status=aberto';
+    context.network[0].requestHeaders = { authorization: 'Bearer segredo', 'content-type': 'application/json' };
+    context.network[0].responseHeaders = { 'set-cookie': 'sessao=1', 'content-type': 'application/json' };
     const res = await handler(post(body));
     expect(res.status).toBe(201);
 
@@ -153,37 +190,34 @@ describe('createFoxReportHandler', () => {
   });
 
   it('devolve 502 sem vazar o token quando o Monday falha', async () => {
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ errors: [{ message: 'create_board não permitido' }] }), { status: 200, headers: { 'content-type': 'application/json' } }));
-    const handler = createFoxReportHandler({ token: 'token-secreto', workspaceId: '18101704', fetch: fetchMock as unknown as typeof fetch, logger: () => {} });
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ errors: [{ message: 'board não encontrado' }] }), { status: 200, headers: { 'content-type': 'application/json' } }));
+    const handler = createFoxReportHandler({ token: 'token-secreto', boardId: '501', fetch: fetchMock as unknown as typeof fetch, logger: () => {} });
     const res = await handler(post(reportBody()));
     expect(res.status).toBe(502);
     const text = await res.text();
     expect(text).toContain('monday_error');
-    expect(text).toContain('create_board não permitido');
+    expect(text).toContain('board não encontrado');
     expect(text).not.toContain('token-secreto');
   });
 
-  it('ready() provisiona o board do projeto antes do primeiro relato', async () => {
+  it('ready() garante colunas/grupos do board sem criar nada', async () => {
     const { handler, mock } = makeHandler();
     const ready = await handler.ready();
     expect(ready).toEqual({ boardId: '501', boardUrl: 'https://ene.monday.com/boards/501' });
-    expect(mock.calls.createBoard).toEqual([{ name: 'Geral' }]);
+    expect(mock.calls.createBoard).toEqual([]);
     expect(mock.calls.createColumn).toHaveLength(11);
-    const byProject = await handler.ready('Portal eNe');
-    expect(byProject.boardId).toBe('502');
+    expect(mock.calls.createGroup.map(g => g.name)).toEqual(['Histórico', 'Esteira']);
   });
 
-  it('aplica boardPrefix no nome dos boards', async () => {
-    const { handler, mock } = makeHandler({ boardPrefix: 'Fox Report · ' });
-    await handler(post(reportBody()));
-    expect(mock.calls.createBoard).toEqual([{ name: 'Fox Report · Portal eNe' }]);
+  it('exige boardId na criação', () => {
+    const mock = createMondayMock();
+    expect(() => createFoxReportHandler({ token: 't', fetch: mock.fetchMock } as unknown as Parameters<typeof createFoxReportHandler>[0])).toThrow('boardId');
   });
 });
 
 describe('createBoardTemplate', () => {
   it('cria o board template idempotente com grupos e colunas do padrão', async () => {
     const mock = createMondayMock();
-    const { createBoardTemplate } = await import('../../src/server/index');
     const first = await createBoardTemplate({ token: 't', workspaceId: '18101704', fetch: mock.fetchMock });
     expect(first).toEqual({ boardId: '501', boardUrl: 'https://ene.monday.com/boards/501' });
     expect(mock.calls.createBoard).toEqual([{ name: 'Fox Report — Template' }]);
@@ -192,6 +226,43 @@ describe('createBoardTemplate', () => {
     const second = await createBoardTemplate({ token: 't', workspaceId: '18101704', fetch: mock.fetchMock });
     expect(second.boardId).toBe('501');
     expect(mock.calls.createBoard).toHaveLength(1);
+  });
+});
+
+describe('bundle (zip do relato)', () => {
+  it('empacota jsons, capturas e anexo com o nome sanitizado', async () => {
+    const { buildReportZip, bundleName } = await import('../../src/server/index');
+    const { decodeAttachment } = await import('../../src/server/util');
+    const mock = createMondayMock();
+    const handler = createFoxReportHandler({ token: 't', boardId: '501', fetch: mock.fetchMock });
+    void handler;
+    const attachment = decodeAttachment({ name: 'pasta/relatório.zip', type: 'application/zip', dataUrl: 'data:application/zip;base64,' + Buffer.from('PK').toString('base64') }, 10 * 1024 * 1024);
+    expect(attachment).not.toBe('invalid');
+    expect(attachment).not.toBeNull();
+    const zip = buildReportZip({
+      itemId: '777',
+      report: {
+        description: 'd', types: ['Bug'], project: 'p', reporter: 'r', capturedAt: '2026-10-20T00:00:00Z',
+        context: {
+          url: 'https://x', title: 't', viewport: { w: 1, h: 1, dpr: 1 }, scroll: { x: 0, y: 0 }, region: null,
+          userAgent: 'ua', language: 'pt-BR', capturedAt: '2026-10-20T00:00:00Z',
+          elements: [], consoleErrors: [{ at: 'a', message: 'm' }],
+          network: [{ at: 'a', method: 'GET', url: '/x', status: 200, durationMs: 1, type: 'fetch', requestHeaders: { authorization: '[redacted]' } }],
+          metadata: { app: 'a' }, sdk: { name: '@foxtag/fox-report', version: '0.2.0' },
+        },
+      },
+      region: new Uint8Array(PNG.length),
+      full: new Uint8Array(PNG.length),
+      ...(attachment !== 'invalid' && attachment !== null ? { attachment } : {}),
+    });
+    expect(bundleName('777')).toBe('fox-report-777.zip');
+    // nomes presentes no zip (central directory, store method)
+    const text = new TextDecoder().decode(zip);
+    for (const name of ['report.json', 'network.json', 'console.json', 'metadata.json', 'region.png', 'full.png', 'anexo/relatório.zip']) {
+      expect(text).toContain(name);
+    }
+    expect(zip[0]).toBe(0x50); // 'P' de PK\x03\x04
+    expect(zip[1]).toBe(0x4b);
   });
 });
 

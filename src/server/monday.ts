@@ -161,11 +161,35 @@ export class MondayClient {
   }
 
   /**
-   * Garante o board no padrão Fox Report (colunas + grupos Esteira/Histórico).
-   * Reutiliza board existente com o mesmo nome; em board recém-criado remove o
-   * grupo padrão vazio que o Monday inventa. Idempotente.
+   * Caminho do handler: garante colunas e grupos Esteira/Histórico em um board
+   * JÁ existente (duplicado do template pelo usuário). Nunca cria board nem
+   * remove grupos — o que não é Esteira/Histórico é deixado como está.
    */
-  async ensureBoard(boardName: string): Promise<Provisioned> {
+  async ensureBoardById(boardId: string): Promise<Provisioned> {
+    let board = await this.board(boardId);
+    const columns = await this.ensureColumns(boardId, board.columns ?? []);
+    if ((board.columns ?? []).length < BOARD_COLUMNS.length) board = await this.board(boardId);
+    const groups = new Map<string, string>();
+    for (const group of board.groups ?? []) groups.set(group.title, group.id);
+    await this.ensureGroup(boardId, groups, GROUP_HISTORY);
+    await this.ensureGroup(boardId, groups, GROUP_BACKLOG);
+    const allColumns = board.columns ?? [];
+    return {
+      boardId,
+      groups,
+      columns,
+      tipoLabels: this.parseLabels(allColumns.find(c => c.id === columns['Tipo'])),
+      statusLabels: this.parseLabels(allColumns.find(c => c.id === columns['Status'])),
+      accountSlug: await this.accountSlug(),
+    };
+  }
+
+  /**
+   * Caminho do template: procura ou cria o board no padrão (colunas + grupos
+   * Esteira/Histórico); em board recém-criado remove o grupo padrão vazio.
+   * Idempotente. Exige workspaceId.
+   */
+  async ensureTemplateBoard(boardName: string): Promise<Provisioned> {
     const name = sanitizeName(boardName);
     const { id: boardId, created } = await this.findOrCreateBoard(name);
     let board = await this.board(boardId);
