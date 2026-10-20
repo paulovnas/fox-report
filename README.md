@@ -55,11 +55,23 @@ Dependência de runtime: `html-to-image` (captura do DOM no navegador).
 
 ## Configuração mínima
 
+O SDK **não lê variáveis de ambiente nem arquivos de configuração**: as chaves
+são parâmetros passados na criação. De onde o app as obtém — `.env`, secrets
+manager, config central, banco — **é decisão de cada projeto**; basta chegar
+no parâmetro do SDK. Nos exemplos usamos `process.env`/`.env.local` apenas
+por ser o caminho comum em Node.
+
+- **Servidor:** `token` (obrigatório) em `createEneReportHandler` e
+  `createBoardTemplate` — nunca no navegador.
+- **Cliente:** não precisa de chave; só `endpoint`, `project` e o controle
+  `enabled`.
+
 ### 1. Servidor: token + projeto
 
-Crie `.env.local` no servidor do app (nunca versionado; já está no `.gitignore`):
+Um exemplo obtendo o token de variável de ambiente (uma das opções):
 
 ```dotenv
+# .env.local do SEU app — só um exemplo de origem; use o que preferir.
 MONDAY_API_TOKEN=seu-token-do-monday
 ```
 
