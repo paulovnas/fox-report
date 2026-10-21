@@ -1,22 +1,32 @@
 import { ApiError, sendReport } from './api';
-import { captureViewport, cropImage, maskImage, maskRects, selectorList } from './capture';
+import { COLORS, TOOLS, drawShape, isMeaningful } from './annotate';
+import { captureViewport, cropImage, maskImage, maskRects, renderAnnotations, selectorList } from './capture';
 import { buildContext, installConsoleCapture } from './context';
 import { resolveStrings } from './i18n';
 import { recentNetwork, startNetworkRecorder } from './network';
 import { CSS_TEXT } from './styles';
-import type { FoxReportInstance, FoxReportOptions, Rect, ReportAttachment, ReportPayload, SendResult, Strings } from './types';
+import type { FoxReportInstance, FoxReportOptions, Pt, Rect, ReportAttachment, ReportPayload, SendResult, Shape, Strings, Tool } from './types';
 
-export type { FoxReportInstance, FoxReportOptions, NetworkEntry, ReportContext, ReportPayload, Rect, SendResult, Strings, Position, ElementInfo, ConsoleEntry } from './types';
+export type { FoxReportInstance, FoxReportOptions, NetworkEntry, Shape, Tool, ReportContext, ReportPayload, Rect, SendResult, Strings, Position, ElementInfo, ConsoleEntry } from './types';
 export { resolveStrings, DEFAULT_STRINGS } from './i18n';
 export { SDK_VERSION } from './version';
 
-type Phase = 'idle' | 'capturing' | 'select' | 'sheet' | 'sending' | 'sent';
+type Phase = 'idle' | 'capturing' | 'select' | 'annotate' | 'sheet' | 'sending' | 'sent';
 const MIN_SIDE = 24;
 const DEFAULT_TYPES = ['Bug', 'Layout', 'Conteúdo', 'Outro'];
 const ICON_BUG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 2 1.9 1.9M14.1 3.9 16 2M9 7.1v-1a3 3 0 0 1 6 0v1"/><path d="M12 20a6 6 0 0 1-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3a6 6 0 0 1-6 6Z"/><path d="M12 20v-9M6.5 13H2M17.5 13H22M6 7.5 3.5 6M18 7.5 20.5 6M6.5 17.5 3 19M17.5 17.5 21 19"/></svg>';
 const ICON_X = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>';
 const ICON_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
 const ICON_SPIN = '<svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.2-8.56"/></svg>';
+const svg = (d: string) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+const TOOL_ICON: Record<Tool, string> = {
+  arrow: svg('<path d="M5 19 19 5M9 5h10v10"/>'),
+  rect: svg('<rect x="4" y="5" width="16" height="14" rx="1"/>'),
+  ellipse: svg('<ellipse cx="12" cy="12" rx="9" ry="7"/>'),
+  pen: svg('<path d="m4 20 1-4L16.5 4.5a2.1 2.1 0 0 1 3 3L8 19l-4 1Z"/>'),
+};
+const ICON_UNDO = svg('<path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>');
+const ICON_CLEAR = svg('<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>');
 const FOCUSABLE = 'button:not([disabled]), textarea, input, [href], [tabindex]:not([tabindex="-1"])';
 
 type Attrs = Record<string, string | boolean | number | undefined>;
@@ -62,6 +72,10 @@ class FoxReport implements FoxReportInstance {
   private error = '';
   private full = '';
   private region = '';
+  private clean = '';
+  private shapes: Shape[] = [];
+  private tool: Tool = 'arrow';
+  private color = COLORS[0];
   private text = '';
   private chosen: string[] = [];
   private attachment: ReportAttachment | null = null;
@@ -159,6 +173,8 @@ class FoxReport implements FoxReportInstance {
     this.chosen = [];
     this.attachment = null;
     this.full = '';
+    this.clean = '';
+    this.shapes = [];
     this.region = '';
     this.startPt = null;
   }
@@ -177,7 +193,7 @@ class FoxReport implements FoxReportInstance {
       const raw = await (this.o.captureFn ? this.o.captureFn() : captureViewport({ maxPixelRatio: this.o.maxPixelRatio, exclude: this.o.exclude }));
       if (run !== this.run) return;
       const rects = maskRects({ maskInputs: this.o.maskInputs !== false, selectors: this.maskSelectors });
-      this.full = await maskImage(raw, rects, { w: window.innerWidth, h: window.innerHeight });
+      this.clean = await maskImage(raw, rects, { w: window.innerWidth, h: window.innerHeight });
       if (run !== this.run) return;
       this.go('select');
     } catch (e) {
@@ -188,14 +204,26 @@ class FoxReport implements FoxReportInstance {
     }
   }
 
-  private async choose(rect: Rect) {
-    const run = this.run;
+  /** A área foi escolhida: segue para as anotações (opcionais) antes do formulário. */
+  private annotate(rect: Rect) {
     this.rect = rect;
+    this.shapes = [];
+    this.hint = '';
+    this.go('annotate');
+  }
+
+  /** Grava as anotações na tela inteira, recorta a área escolhida e abre o formulário. */
+  private async choose() {
+    const run = this.run, rect = this.rect;
+    if (!rect) return;
     try {
       const viewport = { w: window.innerWidth, h: window.innerHeight };
       const whole = rect.x === 0 && rect.y === 0 && rect.w >= viewport.w && rect.h >= viewport.h;
-      this.region = whole ? this.full : await cropImage(this.full, rect, viewport);
+      const full = await renderAnnotations(this.clean, this.shapes, viewport);
+      const region = whole ? full : await cropImage(full, rect, viewport);
       if (run !== this.run) return;
+      this.full = full;
+      this.region = region;
       this.go('sheet');
     } catch (e) {
       this.fail(e);
@@ -203,7 +231,7 @@ class FoxReport implements FoxReportInstance {
       this.go('select');
     }
   }
-  private wholeScreen() { void this.choose({ x: 0, y: 0, w: window.innerWidth, h: window.innerHeight }); }
+  private wholeScreen() { this.annotate({ x: 0, y: 0, w: window.innerWidth, h: window.innerHeight }); }
 
   private async buildReport(): Promise<ReportPayload> {
     let metadata: Record<string, unknown> = {};
@@ -270,6 +298,7 @@ class FoxReport implements FoxReportInstance {
     this.shell = shell;
     if ((this.phase === 'idle' || this.phase === 'capturing') && this.o.showButton !== false && this.isEnabled()) shell.append(this.renderFab());
     if (this.phase === 'select') shell.append(this.renderSelect());
+    if (this.phase === 'annotate') shell.append(this.renderAnnotate());
     if (this.phase === 'sheet' || this.phase === 'sending' || this.phase === 'sent') shell.append(this.renderSheet());
     const live = h('div', { class: 'sr', role: 'status', 'aria-live': 'polite' },
       this.phase === 'capturing' ? this.t.loading : this.phase === 'sent' ? this.t.sentTitle : this.error || '');
@@ -335,7 +364,7 @@ class FoxReport implements FoxReportInstance {
         bar.firstElementChild!.textContent = t.selectTooSmall;
         return;
       }
-      void this.choose(r);
+      this.annotate(r);
     });
     layer.addEventListener('pointercancel', () => { this.startPt = null; this.rect = null; paintRect(); });
     // Teclado: setas movem a caixa, Shift+setas redimensionam, Enter confirma, Escape cancela.
@@ -345,7 +374,7 @@ class FoxReport implements FoxReportInstance {
       const step = 24, vw = window.innerWidth, vh = window.innerHeight;
       if (e.key === 'Enter') {
         e.preventDefault();
-        if (this.rect && this.rect.w >= MIN_SIDE) void this.choose(this.rect);
+        if (this.rect && this.rect.w >= MIN_SIDE) this.annotate(this.rect);
         else this.wholeScreen();
         return;
       }
@@ -368,6 +397,107 @@ class FoxReport implements FoxReportInstance {
     return layer;
   }
 
+  /** Mantém a área escolhida e oferece a régua de anotação (seta, retângulo, círculo, caneta). */
+  private renderAnnotate(): HTMLElement {
+    const t = this.t, rect = this.rect!;
+    const vw = window.innerWidth, vh = window.innerHeight, dpr = window.devicePixelRatio || 1;
+    const layer = h('div', { class: 'layer annotating', tabindex: '0', role: 'application', 'aria-label': t.annotateHint, 'data-testid': 'fox-annotate-layer' });
+    const frame = h('div', { class: 'rect' });
+    frame.style.cssText = `display:block;left:${rect.x}px;top:${rect.y}px;width:${rect.w}px;height:${rect.h}px`;
+    const canvas = h('canvas', { class: 'draw' });
+    canvas.width = Math.round(vw * dpr);
+    canvas.height = Math.round(vh * dpr);
+    const ctx = canvas.getContext('2d');
+    let draft: Shape | null = null;
+    const redraw = () => {
+      if (!ctx) return;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      for (const s of draft ? [...this.shapes, draft] : this.shapes) drawShape(ctx, s);
+    };
+
+    // ---- barra de ferramentas
+    const tools = h('div', { class: 'tools', role: 'toolbar', 'aria-label': t.toolsLabel });
+    const cx = Math.min(Math.max(rect.x + rect.w / 2, Math.min(vw / 2, 230)), vw - Math.min(vw / 2, 230));
+    tools.style.left = `${cx}px`;
+    if (rect.y + rect.h + 64 <= vh) tools.style.top = `${rect.y + rect.h + 8}px`;
+    else if (rect.y >= 64) tools.style.bottom = `${vh - rect.y + 8}px`;
+    else tools.style.bottom = '12px';
+
+    const names: Record<Tool, string> = { arrow: t.toolArrow, rect: t.toolRect, ellipse: t.toolEllipse, pen: t.toolPen };
+    const toolBtns = TOOLS.map(tool => {
+      const b = h('button', { type: 'button', class: 'tool', 'aria-label': names[tool], title: names[tool], 'data-tool': tool }, icon(TOOL_ICON[tool]));
+      b.addEventListener('click', () => { this.tool = tool; sync(); });
+      return b;
+    });
+    const swatches = COLORS.map((color, i) => {
+      const b = h('button', { type: 'button', class: 'swatch', 'aria-label': `${t.toolColor} ${i + 1}`, title: t.toolColor, 'data-color': color });
+      b.style.background = color;
+      b.addEventListener('click', () => { this.color = color; sync(); });
+      return b;
+    });
+    const undo = h('button', { type: 'button', class: 'tool', 'aria-label': t.toolUndo, title: t.toolUndo, 'data-act': 'undo' }, icon(ICON_UNDO));
+    const clear = h('button', { type: 'button', class: 'tool', 'aria-label': t.toolClear, title: t.toolClear, 'data-act': 'clear' }, icon(ICON_CLEAR));
+    const doUndo = () => { this.shapes.pop(); redraw(); sync(); };
+    undo.addEventListener('click', doUndo);
+    clear.addEventListener('click', () => { this.shapes = []; redraw(); sync(); });
+    const sync = () => {
+      toolBtns.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.tool === this.tool)));
+      swatches.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.color === this.color)));
+      undo.disabled = clear.disabled = !this.shapes.length;
+    };
+    const again = h('button', { type: 'button', class: 'text-btn' }, t.anotherArea);
+    again.addEventListener('click', () => { this.rect = null; this.shapes = []; this.go('select'); });
+    const cancel = h('button', { type: 'button', class: 'text-btn', 'aria-label': t.cancel }, icon(ICON_X), t.cancel);
+    cancel.addEventListener('click', () => { this.reset(); this.render(); this.restoreFocus(); });
+    const done = h('button', { type: 'button', class: 'done' }, t.continue);
+    done.addEventListener('click', () => { done.disabled = true; void this.choose(); });
+    const sep = () => h('span', { class: 'sep', 'aria-hidden': 'true' });
+    tools.append(...toolBtns, sep(), ...swatches, sep(), undo, clear, sep(), again, cancel, done);
+    sync();
+
+    // ---- desenho: só dentro da área escolhida
+    const inside = (e: PointerEvent): Pt => ({
+      x: Math.round(Math.min(rect.x + rect.w, Math.max(rect.x, e.clientX))),
+      y: Math.round(Math.min(rect.y + rect.h, Math.max(rect.y, e.clientY))),
+    });
+    canvas.addEventListener('pointerdown', e => {
+      if (e.button > 0) return;
+      e.preventDefault();
+      try { canvas.setPointerCapture(e.pointerId); } catch { /* sem suporte */ }
+      const p = inside(e);
+      draft = { tool: this.tool, color: this.color, pts: [p, p] };
+      redraw();
+    });
+    canvas.addEventListener('pointermove', e => {
+      if (!draft) return;
+      const p = inside(e);
+      if (draft.tool === 'pen') draft.pts.push(p); else draft.pts[1] = p;
+      redraw();
+    });
+    const finish = (commit: boolean) => {
+      if (draft && commit && isMeaningful(draft)) this.shapes.push(draft);
+      draft = null;
+      redraw();
+      sync();
+    };
+    canvas.addEventListener('pointerup', e => {
+      try { canvas.releasePointerCapture(e.pointerId); } catch { /* já liberado */ }
+      finish(true);
+    });
+    canvas.addEventListener('pointercancel', () => finish(false));
+
+    layer.addEventListener('keydown', e => {
+      if (e.key === 'Escape') { this.reset(); this.render(); this.restoreFocus(); return; }
+      if ((e.key === 'z' || e.key === 'Z') && (e.ctrlKey || e.metaKey)) { e.preventDefault(); doUndo(); return; }
+      if (e.key === 'Enter' && e.target === layer) { e.preventDefault(); void this.choose(); }
+    });
+    layer.append(frame, canvas, tools);
+    queueMicrotask(() => layer.focus());
+    return layer;
+  }
+
   private renderSheet(): HTMLElement {
     const t = this.t;
     const backdrop = h('div', { class: 'backdrop' });
@@ -375,11 +505,11 @@ class FoxReport implements FoxReportInstance {
     sheet.style.bottom = `${this.kb}px`;
     backdrop.append(sheet);
     if (this.phase === 'sent') {
-      const content = h('div', { class: 'sent' }, icon(ICON_CHECK), h('strong', {}, t.sentTitle), h('span', {}, t.sentBody));
+      const content = h('div', { class: 'sent' }, h('div', { class: 'sent-icon' }, icon(ICON_CHECK)), h('strong', {}, t.sentTitle), h('span', {}, t.sentBody));
       const url = this.sentResult?.url;
       void url;
       sheet.append(content);
-      const close = h('button', { type: 'button', class: 'link' }, t.close);
+      const close = h('button', { type: 'button', class: 'close-btn' }, t.close);
       close.addEventListener('click', () => { this.reset(); this.render(); this.restoreFocus(); });
       sheet.append(close);
       queueMicrotask(() => sheet.focus());

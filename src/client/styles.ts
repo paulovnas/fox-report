@@ -27,6 +27,22 @@ button { font: inherit; color: inherit; }
 .bar button { min-height: 44px; padding: 0 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,.5); background: transparent; color: #fff; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; pointer-events: auto; }
 .bar button.primary { background: #fff; color: #14171f; font-weight: 600; }
 .bar svg { width: 18px; height: 18px; }
+.layer.annotating { background: transparent; cursor: default; }
+.draw { position: absolute; inset: 0; width: 100%; height: 100%; cursor: crosshair; touch-action: none; }
+.tools { position: absolute; transform: translateX(-50%); width: max-content; max-width: calc(100vw - 16px); padding: 6px 8px; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px; background: #14171f; color: #fff; border-radius: 14px; box-shadow: 0 6px 20px rgba(10,14,24,.4); cursor: default; }
+.tools button { min-height: 44px; border-radius: 10px; border: 1px solid transparent; background: transparent; color: #fff; display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; }
+.tools .tool { width: 44px; padding: 0; }
+.tools .tool[aria-pressed="true"] { background: #fff; color: #14171f; }
+.tools .tool:disabled { opacity: .35; cursor: not-allowed; }
+.tools .swatch { width: 32px; min-height: 32px; height: 32px; padding: 0; border-radius: 50%; border: 2px solid transparent; }
+.tools .swatch[aria-pressed="true"] { border-color: #fff; box-shadow: 0 0 0 2px #14171f inset; }
+.tools .text-btn { padding: 0 10px; border-color: rgba(255,255,255,.5); }
+.tools .done { padding: 0 16px; background: #fff; color: #14171f; font-weight: 600; }
+.tools .done:disabled { opacity: .6; cursor: progress; }
+.tools svg { width: 20px; height: 20px; }
+.tools .text-btn svg { width: 16px; height: 16px; }
+.tools .sep { width: 1px; height: 24px; background: rgba(255,255,255,.25); }
+@media (max-width: 600px) { .tools { left: 50% !important; top: auto !important; bottom: calc(env(safe-area-inset-bottom, 0px) + 8px) !important; } .tools .sep { display: none; } }
 .backdrop { position: fixed; z-index: calc(var(--fox-z, 2147483000) + 2); inset: 0; background: rgba(10,14,24,.55); }
 .sheet { position: absolute; left: 0; right: 0; max-height: 92vh; max-height: 92dvh; overflow-y: auto; background: var(--fox-bg); color: var(--fox-ink); border-radius: 18px 18px 0 0; padding: 14px 16px calc(16px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 10px; box-shadow: 0 -8px 30px rgba(10,14,24,.35); outline: none; }
 @media (min-width: 801px) { .sheet { left: 50%; right: auto; width: 480px; transform: translateX(-50%); bottom: 24px !important; border-radius: 18px; } }
@@ -55,7 +71,9 @@ button { font: inherit; color: inherit; }
 .attach-clear { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--fox-line); background: var(--fox-bg); color: var(--fox-muted); cursor: pointer; }
 .attach-clear svg { width: 12px; height: 12px; }
 .attach-note { color: var(--fox-err); font-size: 13px; }
-.sent { display: grid; justify-items: center; gap: 6px; padding: 24px 0; text-align: center; color: var(--fox-ok); } .sent span { color: var(--fox-muted); } .sent svg { width: 28px; height: 28px; }
+.sent { display: grid; justify-items: center; gap: 6px; padding: 20px 0 8px; text-align: center; color: var(--fox-ok); } .sent span { color: var(--fox-muted); }
+.sent-icon { width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; margin-bottom: 6px; background: rgba(21,128,61,.16); } .sent .sent-icon span { color: inherit; } .sent-icon svg { width: 28px; height: 28px; }
+.close-btn { align-self: center; min-width: 140px; min-height: 44px; padding: 0 28px; border: 0; border-radius: 12px; background: var(--fox-accent); color: var(--fox-on-accent); font-size: 16px; font-weight: 600; cursor: pointer; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 @media print { .fox { display: none !important; } }
 `;

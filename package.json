@@ -1,6 +1,6 @@
 {
   "name": "@foxtag/fox-report",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Relato de bugs com captura de tela e contexto, integrado ao Monday. Widget universal para web e handler server-side.",
   "keywords": [
     "bug-report",
@@ -50,6 +50,7 @@
   },
   "scripts": {
     "build": "node scripts/build.mjs",
+    "demo": "node scripts/build-demo.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:integration": "node test/integration.monday.mjs",

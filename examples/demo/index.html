@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Portal eNe — Pedidos (demo do Fox Report)</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 15px/1.45 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; color: #1c2230; background: #f3f5f9; display: grid; grid-template-columns: 220px 1fr; grid-template-rows: minmax(100vh, auto); }
+    aside { background: #14213d; color: #dbe3f5; padding: 20px 14px; }
+    aside h1 { font-size: 17px; margin: 0 0 22px; color: #fff; }
+    aside a { display: block; padding: 9px 12px; border-radius: 8px; color: inherit; text-decoration: none; margin-bottom: 4px; }
+    aside a.on { background: #2a3a66; color: #fff; }
+    main { padding: 24px 32px; min-width: 0; }
+    header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+    header h2 { margin: 0; font-size: 22px; }
+    .toggle { display: flex; align-items: center; gap: 8px; background: #fff; border: 1px solid #d9dfeb; border-radius: 10px; padding: 8px 12px; font-size: 14px; }
+    .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 20px; }
+    .card { background: #fff; border: 1px solid #e1e6f0; border-radius: 12px; padding: 16px; }
+    .card small { color: #5d6980; display: block; }
+    .card strong { font-size: 24px; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #e1e6f0; border-radius: 12px; overflow: hidden; }
+    th, td { padding: 12px 14px; text-align: left; border-bottom: 1px solid #eef1f6; white-space: nowrap; }
+    th { background: #f8f9fc; font-size: 13px; color: #5d6980; }
+    .badge { display: inline-block; padding: 2px 10px; border-radius: 99px; font-size: 13px; background: #dcfce7; color: #166534; }
+    .badge.warn { background: #fef3c7; color: #92400e; }
+    .btn { border: 0; background: #2563eb; color: #fff; border-radius: 8px; padding: 6px 12px; font: inherit; }
+    /* Defeito proposital da demonstração: o total ficou "NaN" e o botão estourou a célula. */
+    .bug-total { color: #b91c1c; font-weight: 600; }
+    .bug-btn { width: 150px; margin-left: -60px; }
+    .note { margin-top: 18px; color: #5d6980; font-size: 14px; }
+    @media (max-width: 700px) { body { grid-template-columns: 1fr; } aside { display: none; } .cards { grid-template-columns: 1fr; } main { padding: 16px; } table { display: block; overflow-x: auto; } }
+  </style>
+</head>
+<body>
+  <aside>
+    <h1>Portal eNe</h1>
+    <a href="#" class="on">Pedidos</a>
+    <a href="#">Clientes</a>
+    <a href="#">Estoque</a>
+    <a href="#">Relatórios</a>
+  </aside>
+  <main>
+    <header>
+      <h2>Pedidos recentes</h2>
+      <label class="toggle">
+        <input type="checkbox" id="fox-toggle" checked>
+        Módulo Fox Report habilitado
+      </label>
+    </header>
+
+    <section class="cards" aria-label="Resumo">
+      <div class="card"><small>Pedidos hoje</small><strong>128</strong></div>
+      <div class="card"><small>Faturamento</small><strong>R$ 48.230,00</strong></div>
+      <div class="card"><small>Em atraso</small><strong>7</strong></div>
+    </section>
+
+    <table>
+      <thead><tr><th>Pedido</th><th>Cliente</th><th>Status</th><th>Total</th><th>Ação</th></tr></thead>
+      <tbody>
+        <tr><td>#10231</td><td>Mercado Aurora</td><td><span class="badge">Pago</span></td><td>R$ 1.840,00</td><td><button class="btn">Detalhes</button></td></tr>
+        <tr><td>#10232</td><td>Clínica Vida</td><td><span class="badge warn">Pendente</span></td><td class="bug-total">R$ NaN</td><td><button class="btn bug-btn">Detalhes</button></td></tr>
+        <tr><td>#10233</td><td>Oficina Nova Rota</td><td><span class="badge">Pago</span></td><td>R$ 920,50</td><td><button class="btn">Detalhes</button></td></tr>
+        <tr><td>#10234</td><td>Padaria Central</td><td><span class="badge">Pago</span></td><td>R$ 312,00</td><td><button class="btn">Detalhes</button></td></tr>
+      </tbody>
+    </table>
+    <p class="note">Página de demonstração do Fox Report — roda 100% offline, o envio é simulado e nada sai do navegador.</p>
+  </main>
+
+  <script src="./fox-report.demo.js"></script>
+  <script>
+    // Servidor simulado: devolve o que o handler real devolveria, sem rede.
+    const fakeServer = async (_url, init) => {
+      const payload = JSON.parse(init.body);
+      window.lastReport = payload;
+      await new Promise(r => setTimeout(r, 600));
+      return new Response(JSON.stringify({ id: '10001' }), { status: 200, headers: { 'content-type': 'application/json' } });
+    };
+
+    const toggle = document.getElementById('fox-toggle');
+    const report = FoxReportSDK.createFoxReport({
+      endpoint: '/api/fox-report',
+      project: 'Portal eNe',
+      reporter: 'demo@ene.com.br',
+      enabled: () => toggle.checked,
+      fetch: fakeServer,
+    });
+    // O app decide quando o módulo aparece: aqui, pela caixa de seleção.
+    toggle.addEventListener('change', () => report.setEnabled(toggle.checked));
+  </script>
+</body>
+</html>

@@ -1,6 +1,7 @@
 /* Renderiza o viewport visível em PNG (html-to-image, MIT) e recorta a área escolhida.
    Inputs e elementos marcados são cobertos na imagem, sem piscar na página. */
-import type { Rect } from './types';
+import { drawShape } from './annotate';
+import type { Rect, Shape } from './types';
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
@@ -109,5 +110,20 @@ export async function cropImage(full: string, rect: Rect, viewport: { w: number;
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Este navegador não consegue recortar a captura.');
   ctx.drawImage(img, x, y, w, h, 0, 0, w, h);
+  return canvas.toDataURL('image/png');
+}
+
+/** Grava as anotações (coordenadas do viewport) por cima da imagem, em qualquer escala de captura. */
+export async function renderAnnotations(full: string, shapes: Shape[], viewport: { w: number; h: number }): Promise<string> {
+  if (!shapes.length) return full;
+  const img = await load(full);
+  const canvas = document.createElement('canvas');
+  canvas.width = img.naturalWidth;
+  canvas.height = img.naturalHeight;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Este navegador não consegue desenhar sobre a captura.');
+  ctx.drawImage(img, 0, 0);
+  ctx.setTransform(img.naturalWidth / viewport.w, 0, 0, img.naturalHeight / viewport.h, 0, 0);
+  for (const s of shapes) drawShape(ctx, s);
   return canvas.toDataURL('image/png');
 }

@@ -13,3 +13,6 @@ coverage
 # Ferramenta de referência (repo aninhado de terceiros, MIT vmatheus3):
 # é material de estudo local, não faz parte do pacote publicado.
 docs/bug-frame/
+
+# Bundle da página de demonstração (gerado por npm run demo)
+examples/demo/fox-report.demo.js

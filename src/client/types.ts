@@ -67,6 +67,11 @@ export type SendResult = { id: string; url?: string };
 
 export type Position = 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
 
+export type Pt = { x: number; y: number };
+export type Tool = 'arrow' | 'rect' | 'ellipse' | 'pen';
+/** Marcação desenhada pelo usuário, em coordenadas do viewport. */
+export type Shape = { tool: Tool; color: string; pts: Pt[] };
+
 export type Strings = {
   button: string;
   loading: string;
@@ -91,6 +96,16 @@ export type Strings = {
   attachmentTooLarge: string;
   sendFailed: string;
   close: string;
+  annotateHint: string;
+  toolsLabel: string;
+  toolArrow: string;
+  toolRect: string;
+  toolEllipse: string;
+  toolPen: string;
+  toolUndo: string;
+  toolClear: string;
+  toolColor: string;
+  continue: string;
 };
 
 export type FoxReportOptions = {

@@ -24,6 +24,16 @@ export const DEFAULT_STRINGS: Strings = {
   attachmentTooLarge: 'Arquivo grande demais. Limite: {max}.',
   sendFailed: 'Não foi possível enviar o relato. Sua descrição foi mantida, tente de novo.',
   close: 'Fechar',
+  annotateHint: 'Marque o problema (opcional)',
+  toolsLabel: 'Ferramentas de anotação',
+  toolArrow: 'Seta',
+  toolRect: 'Retângulo',
+  toolEllipse: 'Círculo',
+  toolPen: 'Caneta',
+  toolUndo: 'Desfazer',
+  toolClear: 'Limpar',
+  toolColor: 'Cor',
+  continue: 'Continuar',
 };
 
 export function resolveStrings(overrides: Partial<Strings> | undefined): Strings {

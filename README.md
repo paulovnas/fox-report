@@ -6,6 +6,45 @@ Widget universal de relato de bugs para aplicações web, com captura da aba,
 da região selecionada e do contexto do momento do erro. Cada relato vira uma
 tarefa no Monday, com update detalhado e as duas imagens anexadas.
 
+## Veja funcionando
+
+Fluxo real do widget, capturado na página de demonstração (`examples/demo`):
+
+**1. O app habilita o módulo e o botão aparece** (aqui, no canto inferior direito — configurável com `position`).
+
+<img src="assets/screenshots/1-botao.png" width="760" alt="Página de pedidos com o botão flutuante do Fox Report no canto inferior direito">
+
+**2. O usuário arrasta uma caixa em volta do problema** (ou escolhe "Tela inteira").
+
+<img src="assets/screenshots/2-selecao.png" width="760" alt="Seleção de região: a linha do pedido #10232 destacada e o restante da tela escurecido">
+
+**3. Anota a captura** com a régua de ferramentas: seta, retângulo, círculo, caneta, 4 cores, desfazer e limpar. As marcações ficam gravadas nas imagens enviadas.
+
+<img src="assets/screenshots/3-anotacao.png" width="760" alt="Régua de anotação com círculo em volta de R$ NaN, retângulo no botão e uma seta">
+
+**4. Descreve o problema.** O preview já mostra a região recortada com as anotações; é possível escolher o tipo e anexar um arquivo.
+
+<img src="assets/screenshots/4-formulario.png" width="760" alt="Formulário Relatar um problema com preview anotado, descrição e tipo Bug selecionado">
+
+**5. Envia.** A confirmação é simples — o usuário não vê detalhes de onde o relato foi parar.
+
+<img src="assets/screenshots/5-enviado.png" width="760" alt="Confirmação: Enviado. Obrigado. Seu relato foi encaminhado ao suporte.">
+
+### Rodar a demonstração localmente
+
+A página funciona **sem rede e sem servidor de relatos**: o `fetch` do widget é
+substituído por um servidor simulado, então nada é enviado ao Monday.
+
+```bash
+npm install
+npm run demo                                   # gera examples/demo/fox-report.demo.js
+python3 -m http.server 4173 --directory examples/demo
+# abra http://localhost:4173
+```
+
+A caixa "Módulo Fox Report habilitado" no topo da página mostra o controle do
+app sobre o botão (`enabled` / `setEnabled`).
+
 O pacote tem dois pontos de entrada:
 
 - `@foxtag/fox-report` — widget client, sem dependência de framework.
@@ -231,7 +270,11 @@ Importante: o módulo que cria o handler deve ser inicializado na requisição
 
 - Descrição obrigatória e tipos escolhidos (chips).
 - Projeto (define o board no Monday) e reporter opcional.
-- **PNG da região selecionada** e **PNG da aba inteira**.
+- **PNG da região selecionada** e **PNG da aba inteira**. Depois de arrastar a
+  área, o usuário pode anotar a captura com a régua de ferramentas (seta,
+  retângulo, círculo, caneta, 4 cores, desfazer e limpar); as marcações ficam
+  gravadas nas duas imagens e o desenho fica restrito à área escolhida. Os
+  rótulos são textos de `strings` (`toolArrow`, `toolRect`, `annotateHint`...).
 - URL redigida, título, viewport, DPR, scroll e data/hora da captura.
 - Caminho e texto dos elementos sob a região (até 8).
 - Erros de console e exceções não tratadas dos últimos 60s (até 30).
